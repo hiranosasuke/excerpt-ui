@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
 import 'theme.dart';
+import 'screens/sign_in_page.dart';
 
 void main() {
   runApp(const DailyBeliefsApp());
@@ -53,21 +54,72 @@ class _RootScreenState extends State<RootScreen> {
 
     return Scaffold(
       body: screens[index],
-      bottomNavigationBar: BottomNavigationBar(
+      bottomNavigationBar: CustomBottomNavBar(
         currentIndex: index,
         onTap: (i) => setState(() => index = i),
-        backgroundColor: const Color(0xFF3F51B5),
-        selectedItemColor: Colors.white,
-        unselectedItemColor: Colors.white70,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.today), label: "Today"),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.menu_book), label: "Library"),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.local_fire_department), label: "Streak"),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.settings), label: "Settings"),
-        ],
+      ),
+      extendBody: true,
+    );
+  }
+}
+
+class CustomBottomNavBar extends StatelessWidget {
+  final int currentIndex;
+  final Function(int) onTap;
+
+  const CustomBottomNavBar({
+    super.key,
+    required this.currentIndex,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      {'icon': Icons.today, 'label': 'Today'},
+      {'icon': Icons.menu_book, 'label': 'Library'},
+      {'icon': Icons.local_fire_department, 'label': 'Streak'},
+      {'icon': Icons.settings, 'label': 'Settings'},
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24, left: 16, right: 16),
+      child: Container(
+        height: 60,
+        decoration: BoxDecoration(
+          color: const Color(0xFF2A2A3E),
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: Colors.white10, width: 1),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: List.generate(items.length, (i) {
+            final isSelected = i == currentIndex;
+            return GestureDetector(
+              onTap: () => onTap(i),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                decoration: BoxDecoration(
+                  color:
+                      isSelected ? const Color(0xFF3F51B5) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      items[i]['icon'] as IconData,
+                      color: isSelected ? Colors.white : Colors.white54,
+                      size: 24,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ),
       ),
     );
   }
@@ -107,30 +159,36 @@ class HomeScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text("Today's Practice")),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(prompt["text"]!,
-                style:
-                    const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center),
-            const SizedBox(height: 20),
-            Text(prompt["book"]!,
-                style: const TextStyle(fontSize: 16),
-                textAlign: TextAlign.center),
-            const SizedBox(height: 30),
-            ElevatedButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Marked as practiced!")),
-                );
-              },
-              child: const Text("Mark as Practiced"),
-            )
-          ],
-        ),
+      body: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(prompt["text"]!,
+                    style: const TextStyle(
+                        fontSize: 28, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center),
+                const SizedBox(height: 20),
+                Text(prompt["book"]!,
+                    style: const TextStyle(fontSize: 16),
+                    textAlign: TextAlign.center),
+                const SizedBox(height: 30),
+                ElevatedButton(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Marked as practiced!")),
+                    );
+                  },
+                  child: const Text("Mark as Practiced"),
+                )
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -195,11 +253,14 @@ class StreakScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Streak")),
-      body: const Center(
-        child: Text(
-          "🔥 3 Day Streak\n(placeholder logic)",
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 24),
+      body: Center(
+        child: Transform.translate(
+          offset: const Offset(0, -60),
+          child: const Text(
+            "🔥 3 Day Streak\n(placeholder logic)",
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 24),
+          ),
         ),
       ),
     );
@@ -217,7 +278,7 @@ class SettingsScreen extends StatelessWidget {
       appBar: AppBar(title: const Text("Settings")),
       body: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -365,80 +426,6 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 32),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class SignInPage extends StatelessWidget {
-  final VoidCallback onSignIn;
-
-  const SignInPage({super.key, required this.onSignIn});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text(
-                "Daily Beliefs",
-                style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                "Transform your life with daily practices",
-                style: TextStyle(fontSize: 16),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 60),
-              // Google Sign In Button
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton.icon(
-                  onPressed: onSignIn,
-                  icon: const Text("🔍", style: TextStyle(fontSize: 24)),
-                  label: const Text("Sign in with Google"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Apple Sign In Button
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton.icon(
-                  onPressed: onSignIn,
-                  icon: const Text("", style: TextStyle(fontSize: 24)),
-                  label: const Text("Sign in with Apple"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 40),
-              const Text(
-                "Your privacy is important to us",
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-                textAlign: TextAlign.center,
-              ),
             ],
           ),
         ),
