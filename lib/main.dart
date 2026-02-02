@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
+import 'dart:ui';
 import 'theme.dart';
 import 'screens/sign_in_page.dart';
 
@@ -57,6 +58,38 @@ class _RootScreenState extends State<RootScreen> {
       bottomNavigationBar: CustomBottomNavBar(
         currentIndex: index,
         onTap: (i) => setState(() => index = i),
+        onSettingsTapped: () {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (context) => DraggableScrollableSheet(
+              initialChildSize: 0.9,
+              minChildSize: 0.5,
+              maxChildSize: 0.9,
+              expand: false,
+              snap: true,
+              builder: (context, scrollController) => ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(30),
+                  topRight: Radius.circular(30),
+                ),
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF1A1A2E),
+                  ),
+                  child: SettingsScreen(
+                    scrollController: scrollController,
+                    onSignOut: () {
+                      Navigator.pop(context); // Close modal
+                      widget.onSignOut(); // Then sign out
+                    },
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
       ),
       extendBody: true,
     );
@@ -66,11 +99,13 @@ class _RootScreenState extends State<RootScreen> {
 class CustomBottomNavBar extends StatelessWidget {
   final int currentIndex;
   final Function(int) onTap;
+  final VoidCallback onSettingsTapped;
 
   const CustomBottomNavBar({
     super.key,
     required this.currentIndex,
     required this.onTap,
+    required this.onSettingsTapped,
   });
 
   @override
@@ -79,47 +114,69 @@ class CustomBottomNavBar extends StatelessWidget {
       {'icon': Icons.today, 'label': 'Today'},
       {'icon': Icons.menu_book, 'label': 'Library'},
       {'icon': Icons.local_fire_department, 'label': 'Streak'},
-      {'icon': Icons.settings, 'label': 'Settings'},
     ];
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 24, left: 16, right: 16),
-      child: Container(
-        height: 60,
-        decoration: BoxDecoration(
-          color: const Color(0xFF2A2A3E),
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: Colors.white10, width: 1),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: List.generate(items.length, (i) {
-            final isSelected = i == currentIndex;
-            return GestureDetector(
-              onTap: () => onTap(i),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                decoration: BoxDecoration(
-                  color:
-                      isSelected ? const Color(0xFF3F51B5) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      items[i]['icon'] as IconData,
-                      color: isSelected ? Colors.white : Colors.white54,
-                      size: 24,
-                    ),
-                  ],
-                ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Container(
+              height: 60,
+              decoration: BoxDecoration(
+                color: const Color(0xFF2A2A3E),
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(color: Colors.white10, width: 1),
               ),
-            );
-          }),
-        ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: List.generate(items.length, (i) {
+                  final isSelected = i == currentIndex;
+                  return GestureDetector(
+                    onTap: () => onTap(i),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? const Color(0xFF3F51B5)
+                            : Colors.transparent,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Icon(
+                          items[i]['icon'] as IconData,
+                          color: isSelected ? Colors.white : Colors.white54,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          GestureDetector(
+            onTap: onSettingsTapped,
+            child: Container(
+              height: 60,
+              width: 60,
+              decoration: BoxDecoration(
+                color: const Color(0xFF2A2A3E),
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(color: Colors.white10, width: 1),
+              ),
+              child: const Icon(
+                Icons.settings,
+                color: Colors.white54,
+                size: 28,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -267,168 +324,267 @@ class StreakScreen extends StatelessWidget {
   }
 }
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
+  final ScrollController? scrollController;
   final VoidCallback onSignOut;
 
-  const SettingsScreen({super.key, required this.onSignOut});
+  const SettingsScreen({
+    super.key,
+    this.scrollController,
+    required this.onSignOut,
+  });
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  late ScrollController _scrollController;
+  double _titleOpacity = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = widget.scrollController ?? ScrollController();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    if (widget.scrollController == null) {
+      _scrollController.dispose();
+    }
+    _scrollController.removeListener(_onScroll);
+    super.dispose();
+  }
+
+  void _onScroll() {
+    // Start showing title when scrolled past 40px, fully visible at 80px
+    const double startOffset = 40.0;
+    const double endOffset = 80.0;
+
+    double newOpacity = 0.0;
+    if (_scrollController.offset > startOffset) {
+      newOpacity =
+          ((_scrollController.offset - startOffset) / (endOffset - startOffset))
+              .clamp(0.0, 1.0);
+    }
+
+    if (newOpacity != _titleOpacity) {
+      setState(() {
+        _titleOpacity = newOpacity;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Settings")),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // PREMIUM Section
-              const Padding(
-                padding: EdgeInsets.fromLTRB(0, 24, 0, 12),
-                child: Text(
-                  "PREMIUM",
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey,
-                    letterSpacing: 1.0,
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            controller: _scrollController,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 24, 16, 120),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 24),
+                    child: Text(
+                      "Settings",
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.grey[800],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: ListTile(
-                  leading: const Icon(Icons.card_giftcard),
-                  title: const Text("Upgrade to Premium"),
-                  trailing: const Icon(Icons.arrow_forward),
-                  onTap: () {},
-                ),
-              ),
+                  // PREMIUM Section
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(0, 24, 0, 12),
+                    child: Text(
+                      "PREMIUM",
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[800],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ListTile(
+                      leading: const Icon(Icons.card_giftcard),
+                      title: const Text("Upgrade to Premium"),
+                      trailing: const Icon(Icons.arrow_forward),
+                      onTap: () {},
+                    ),
+                  ),
 
-              // PERSONALIZE Section
-              const Padding(
-                padding: EdgeInsets.fromLTRB(0, 24, 0, 12),
-                child: Text(
-                  "PERSONALIZE",
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey,
-                    letterSpacing: 1.0,
+                  // PERSONALIZE Section
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(0, 24, 0, 12),
+                    child: Text(
+                      "PERSONALIZE",
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.grey[800],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  children: [
-                    ListTile(
-                      leading: const Icon(Icons.book),
-                      title: const Text("Favorite Books"),
-                      trailing: const Icon(Icons.arrow_forward),
-                      onTap: () {},
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[800],
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    const Divider(height: 1),
-                    ListTile(
-                      leading: const Icon(Icons.schedule),
-                      title: const Text("Daily Reminder"),
-                      trailing: const Icon(Icons.arrow_forward),
-                      onTap: () {},
+                    child: Column(
+                      children: [
+                        ListTile(
+                          leading: const Icon(Icons.book),
+                          title: const Text("Favorite Books"),
+                          trailing: const Icon(Icons.arrow_forward),
+                          onTap: () {},
+                        ),
+                        const Divider(height: 1),
+                        ListTile(
+                          leading: const Icon(Icons.schedule),
+                          title: const Text("Daily Reminder"),
+                          trailing: const Icon(Icons.arrow_forward),
+                          onTap: () {},
+                        ),
+                        const Divider(height: 1),
+                        ListTile(
+                          leading: const Icon(Icons.palette),
+                          title: const Text("Theme"),
+                          trailing: const Icon(Icons.arrow_forward),
+                          onTap: () {},
+                        ),
+                        const Divider(height: 1),
+                        ListTile(
+                          leading: const Icon(Icons.language),
+                          title: const Text("Language"),
+                          trailing: const Icon(Icons.arrow_forward),
+                          onTap: () {},
+                        ),
+                      ],
                     ),
-                    const Divider(height: 1),
-                    ListTile(
-                      leading: const Icon(Icons.palette),
-                      title: const Text("Theme"),
-                      trailing: const Icon(Icons.arrow_forward),
-                      onTap: () {},
-                    ),
-                    const Divider(height: 1),
-                    ListTile(
-                      leading: const Icon(Icons.language),
-                      title: const Text("Language"),
-                      trailing: const Icon(Icons.arrow_forward),
-                      onTap: () {},
-                    ),
-                  ],
-                ),
-              ),
+                  ),
 
-              // ABOUT Section
-              const Padding(
-                padding: EdgeInsets.fromLTRB(0, 24, 0, 12),
-                child: Text(
-                  "ABOUT",
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey,
-                    letterSpacing: 1.0,
+                  // ABOUT Section
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(0, 24, 0, 12),
+                    child: Text(
+                      "ABOUT",
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.grey[800],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  children: [
-                    ListTile(
-                      leading: const Icon(Icons.info),
-                      title: const Text("About Us"),
-                      trailing: const Icon(Icons.arrow_forward),
-                      onTap: () {},
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[800],
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    const Divider(height: 1),
-                    ListTile(
-                      leading: const Icon(Icons.help),
-                      title: const Text("Help & Support"),
-                      trailing: const Icon(Icons.arrow_forward),
-                      onTap: () {},
+                    child: Column(
+                      children: [
+                        ListTile(
+                          leading: const Icon(Icons.info),
+                          title: const Text("About Us"),
+                          trailing: const Icon(Icons.arrow_forward),
+                          onTap: () {},
+                        ),
+                        const Divider(height: 1),
+                        ListTile(
+                          leading: const Icon(Icons.help),
+                          title: const Text("Help & Support"),
+                          trailing: const Icon(Icons.arrow_forward),
+                          onTap: () {},
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
+                  ),
 
-              // ACCOUNT Section
-              const Padding(
-                padding: EdgeInsets.fromLTRB(0, 24, 0, 12),
-                child: Text(
-                  "ACCOUNT",
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey,
-                    letterSpacing: 1.0,
+                  // ACCOUNT Section
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(0, 24, 0, 12),
+                    child: Text(
+                      "ACCOUNT",
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.red.withOpacity(0.5)),
-                ),
-                child: ListTile(
-                  leading: const Icon(Icons.logout, color: Colors.red),
-                  title: const Text(
-                    "Sign Out",
-                    style: TextStyle(color: Colors.red),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.red.withOpacity(0.5)),
+                    ),
+                    child: ListTile(
+                      leading: const Icon(Icons.logout, color: Colors.red),
+                      title: const Text(
+                        "Sign Out",
+                        style: TextStyle(color: Colors.red),
+                      ),
+                      trailing:
+                          const Icon(Icons.arrow_forward, color: Colors.red),
+                      onTap: widget.onSignOut,
+                    ),
                   ),
-                  trailing: const Icon(Icons.arrow_forward, color: Colors.red),
-                  onTap: onSignOut,
-                ),
+                  const SizedBox(height: 32),
+                ],
               ),
-              const SizedBox(height: 32),
-            ],
+            ),
           ),
-        ),
+          // Animated header that appears on scroll
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: ClipRect(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(
+                  sigmaX: 10 * _titleOpacity,
+                  sigmaY: 10 * _titleOpacity,
+                ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context)
+                        .scaffoldBackgroundColor
+                        .withValues(alpha: 0.02 * _titleOpacity),
+                  ),
+                  child: SafeArea(
+                    bottom: false,
+                    child: Container(
+                      height: 44,
+                      alignment: Alignment.center,
+                      child: Text(
+                        "Settings",
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white.withValues(alpha: _titleOpacity),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
