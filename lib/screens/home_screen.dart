@@ -39,8 +39,8 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text("Today's Practice")),
       body: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          const Spacer(flex: 2),
           Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -71,6 +71,7 @@ class HomeScreen extends StatelessWidget {
               ],
             ),
           ),
+          const Spacer(flex: 3),
         ],
       ),
     );
