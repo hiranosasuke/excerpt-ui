@@ -1,0 +1,27 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "iPhone (Physical)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "deviceId": "00008120-001164422E6BC01E"
+    },
+    {
+      "name": "iPhone (Profile Mode)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "deviceId": "00008120-001164422E6BC01E",
+      "flutterMode": "profile"
+    },
+    {
+      "name": "macOS",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "deviceId": "macos"
+    }
+  ]
+}

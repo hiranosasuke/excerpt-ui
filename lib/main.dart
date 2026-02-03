@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 import 'dart:math';
 import 'dart:ui';
 import 'theme.dart';
@@ -18,15 +19,22 @@ class DailyBeliefsApp extends StatefulWidget {
 class _DailyBeliefsAppState extends State<DailyBeliefsApp> {
   bool isSignedIn = false;
 
+  void _onThemeChanged() {
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Daily Beliefs',
-      theme: AppTheme.dark,
+      theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.dark,
+      themeMode: AppTheme.isDarkMode ? ThemeMode.dark : ThemeMode.light,
       home: isSignedIn
-          ? RootScreen(onSignOut: () => setState(() => isSignedIn = false))
+          ? RootScreen(
+              onSignOut: () => setState(() => isSignedIn = false),
+              onThemeChanged: _onThemeChanged,
+            )
           : SignInPage(onSignIn: () => setState(() => isSignedIn = true)),
     );
   }
@@ -34,8 +42,13 @@ class _DailyBeliefsAppState extends State<DailyBeliefsApp> {
 
 class RootScreen extends StatefulWidget {
   final VoidCallback onSignOut;
+  final VoidCallback onThemeChanged;
 
-  const RootScreen({super.key, required this.onSignOut});
+  const RootScreen({
+    super.key,
+    required this.onSignOut,
+    required this.onThemeChanged,
+  });
 
   @override
   State<RootScreen> createState() => _RootScreenState();
@@ -50,7 +63,10 @@ class _RootScreenState extends State<RootScreen> {
       const HomeScreen(),
       const LibraryScreen(),
       const StreakScreen(),
-      SettingsScreen(onSignOut: widget.onSignOut),
+      SettingsScreen(
+        onSignOut: widget.onSignOut,
+        onThemeChanged: widget.onThemeChanged,
+      ),
     ];
 
     return Scaffold(
@@ -59,34 +75,18 @@ class _RootScreenState extends State<RootScreen> {
         currentIndex: index,
         onTap: (i) => setState(() => index = i),
         onSettingsTapped: () {
-          showModalBottomSheet(
+          showCupertinoModalBottomSheet(
             context: context,
-            isScrollControlled: true,
-            backgroundColor: Colors.transparent,
-            builder: (context) => DraggableScrollableSheet(
-              initialChildSize: 0.9,
-              minChildSize: 0.5,
-              maxChildSize: 0.9,
-              expand: false,
-              snap: true,
-              builder: (context, scrollController) => ClipRRect(
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(30),
-                  topRight: Radius.circular(30),
-                ),
-                child: Container(
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF1A1A2E),
-                  ),
-                  child: SettingsScreen(
-                    scrollController: scrollController,
-                    onSignOut: () {
-                      Navigator.pop(context); // Close modal
-                      widget.onSignOut(); // Then sign out
-                    },
-                  ),
-                ),
-              ),
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            topRadius: const Radius.circular(20),
+            expand: true,
+            builder: (context) => SettingsScreen(
+              scrollController: ModalScrollController.of(context),
+              onSignOut: () {
+                Navigator.pop(context);
+                widget.onSignOut();
+              },
+              onThemeChanged: widget.onThemeChanged,
             ),
           );
         },
@@ -125,9 +125,12 @@ class CustomBottomNavBar extends StatelessWidget {
             child: Container(
               height: 60,
               decoration: BoxDecoration(
-                color: const Color(0xFF2A2A3E),
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: Colors.white10, width: 1),
+                border: Border.all(
+                  color: Theme.of(context).dividerColor.withOpacity(0.2),
+                  width: 1,
+                ),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -141,14 +144,19 @@ class CustomBottomNavBar extends StatelessWidget {
                       height: 48,
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? const Color(0xFF3F51B5)
+                            ? Theme.of(context).colorScheme.primary
                             : Colors.transparent,
                         shape: BoxShape.circle,
                       ),
                       child: Center(
                         child: Icon(
                           items[i]['icon'] as IconData,
-                          color: isSelected ? Colors.white : Colors.white54,
+                          color: isSelected
+                              ? Theme.of(context).colorScheme.onPrimary
+                              : Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withOpacity(0.6),
                           size: 24,
                         ),
                       ),
@@ -165,13 +173,16 @@ class CustomBottomNavBar extends StatelessWidget {
               height: 60,
               width: 60,
               decoration: BoxDecoration(
-                color: const Color(0xFF2A2A3E),
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: Colors.white10, width: 1),
+                border: Border.all(
+                  color: Theme.of(context).dividerColor.withOpacity(0.2),
+                  width: 1,
+                ),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.settings,
-                color: Colors.white54,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                 size: 28,
               ),
             ),
@@ -240,6 +251,10 @@ class HomeScreen extends StatelessWidget {
                       const SnackBar(content: Text("Marked as practiced!")),
                     );
                   },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Colors.white,
+                  ),
                   child: const Text("Mark as Practiced"),
                 )
               ],
@@ -273,14 +288,16 @@ class _LibraryScreenState extends State<LibraryScreen> {
               p["text"]!,
               style: TextStyle(
                 decoration: isCompleted ? TextDecoration.lineThrough : null,
-                color: isCompleted ? Colors.grey : Colors.white,
+                color: isCompleted
+                    ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
+                    : Theme.of(context).colorScheme.onSurface,
               ),
             ),
             subtitle: Text(p["book"]!),
             leading: isCompleted
-                ? const Icon(
+                ? Icon(
                     Icons.check_circle,
-                    color: Colors.green,
+                    color: Theme.of(context).colorScheme.primary,
                   )
                 : null,
             onTap: () {
@@ -327,11 +344,13 @@ class StreakScreen extends StatelessWidget {
 class SettingsScreen extends StatefulWidget {
   final ScrollController? scrollController;
   final VoidCallback onSignOut;
+  final VoidCallback? onThemeChanged;
 
   const SettingsScreen({
     super.key,
     this.scrollController,
     required this.onSignOut,
+    this.onThemeChanged,
   });
 
   @override
@@ -377,214 +396,362 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  void _toggleTheme() {
+    setState(() {
+      AppTheme.isDarkMode = !AppTheme.isDarkMode;
+    });
+    widget.onThemeChanged?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            controller: _scrollController,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 24, 16, 120),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: 24),
-                    child: Text(
-                      "Settings",
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  // PREMIUM Section
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(0, 24, 0, 12),
-                    child: Text(
-                      "PREMIUM",
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey[800],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: ListTile(
-                      leading: const Icon(Icons.card_giftcard),
-                      title: const Text("Upgrade to Premium"),
-                      trailing: const Icon(Icons.arrow_forward),
-                      onTap: () {},
-                    ),
-                  ),
-
-                  // PERSONALIZE Section
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(0, 24, 0, 12),
-                    child: Text(
-                      "PERSONALIZE",
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey[800],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      children: [
-                        ListTile(
-                          leading: const Icon(Icons.book),
-                          title: const Text("Favorite Books"),
-                          trailing: const Icon(Icons.arrow_forward),
-                          onTap: () {},
-                        ),
-                        const Divider(height: 1),
-                        ListTile(
-                          leading: const Icon(Icons.schedule),
-                          title: const Text("Daily Reminder"),
-                          trailing: const Icon(Icons.arrow_forward),
-                          onTap: () {},
-                        ),
-                        const Divider(height: 1),
-                        ListTile(
-                          leading: const Icon(Icons.palette),
-                          title: const Text("Theme"),
-                          trailing: const Icon(Icons.arrow_forward),
-                          onTap: () {},
-                        ),
-                        const Divider(height: 1),
-                        ListTile(
-                          leading: const Icon(Icons.language),
-                          title: const Text("Language"),
-                          trailing: const Icon(Icons.arrow_forward),
-                          onTap: () {},
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // ABOUT Section
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(0, 24, 0, 12),
-                    child: Text(
-                      "ABOUT",
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey[800],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      children: [
-                        ListTile(
-                          leading: const Icon(Icons.info),
-                          title: const Text("About Us"),
-                          trailing: const Icon(Icons.arrow_forward),
-                          onTap: () {},
-                        ),
-                        const Divider(height: 1),
-                        ListTile(
-                          leading: const Icon(Icons.help),
-                          title: const Text("Help & Support"),
-                          trailing: const Icon(Icons.arrow_forward),
-                          onTap: () {},
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // ACCOUNT Section
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(0, 24, 0, 12),
-                    child: Text(
-                      "ACCOUNT",
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.red.withOpacity(0.5)),
-                    ),
-                    child: ListTile(
-                      leading: const Icon(Icons.logout, color: Colors.red),
-                      title: const Text(
-                        "Sign Out",
-                        style: TextStyle(color: Colors.red),
-                      ),
-                      trailing:
-                          const Icon(Icons.arrow_forward, color: Colors.red),
-                      onTap: widget.onSignOut,
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                ],
-              ),
-            ),
-          ),
-          // Animated header that appears on scroll
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: ClipRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(
-                  sigmaX: 10 * _titleOpacity,
-                  sigmaY: 10 * _titleOpacity,
-                ),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .scaffoldBackgroundColor
-                        .withValues(alpha: 0.02 * _titleOpacity),
-                  ),
-                  child: SafeArea(
-                    bottom: false,
-                    child: Container(
-                      height: 44,
-                      alignment: Alignment.center,
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      child: Scaffold(
+        body: Stack(
+          children: [
+            SingleChildScrollView(
+              controller: _scrollController,
+              physics: const ClampingScrollPhysics(),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 24, 16, 120),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 24),
                       child: Text(
                         "Settings",
                         style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white.withValues(alpha: _titleOpacity),
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
                         ),
+                      ),
+                    ),
+                    // PREMIUM Section
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(0, 24, 0, 12),
+                      child: Text(
+                        "PREMIUM",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withOpacity(0.3),
+                        ),
+                      ),
+                      child: ListTile(
+                        leading: Icon(
+                          Icons.card_giftcard,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        title: const Text("Upgrade to Premium"),
+                        trailing: Icon(
+                          Icons.arrow_forward,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        onTap: () {},
+                      ),
+                    ),
+
+                    // PERSONALIZE Section
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(0, 24, 0, 12),
+                      child: Text(
+                        "PERSONALIZE",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        children: [
+                          ListTile(
+                            leading: const Icon(Icons.book),
+                            title: const Text("Favorite Books"),
+                            trailing: const Icon(Icons.arrow_forward),
+                            onTap: () {},
+                          ),
+                          const Divider(height: 1),
+                          ListTile(
+                            leading: const Icon(Icons.schedule),
+                            title: const Text("Daily Reminder"),
+                            trailing: const Icon(Icons.arrow_forward),
+                            onTap: () {},
+                          ),
+                          const Divider(height: 1),
+                          ListTile(
+                            leading: Icon(
+                              AppTheme.isDarkMode
+                                  ? Icons.dark_mode
+                                  : Icons.light_mode,
+                            ),
+                            title: const Text("Dark Mode"),
+                            trailing: Switch(
+                              value: AppTheme.isDarkMode,
+                              onChanged: (value) => _toggleTheme(),
+                            ),
+                            onTap: _toggleTheme,
+                          ),
+                          const Divider(height: 1),
+                          ListTile(
+                            leading: const Icon(Icons.language),
+                            title: const Text("Language"),
+                            trailing: const Icon(Icons.arrow_forward),
+                            onTap: () {},
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // ABOUT Section
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(0, 24, 0, 12),
+                      child: Text(
+                        "ABOUT",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        children: [
+                          ListTile(
+                            leading: const Icon(Icons.info),
+                            title: const Text("About Us"),
+                            trailing: const Icon(Icons.arrow_forward),
+                            onTap: () {},
+                          ),
+                          const Divider(height: 1),
+                          ListTile(
+                            leading: const Icon(Icons.help),
+                            title: const Text("Help & Support"),
+                            trailing: const Icon(Icons.arrow_forward),
+                            onTap: () {},
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // ACCOUNT Section
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(0, 24, 0, 12),
+                      child: Text(
+                        "ACCOUNT",
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.red.withOpacity(0.5)),
+                      ),
+                      child: ListTile(
+                        leading: const Icon(Icons.logout, color: Colors.red),
+                        title: const Text(
+                          "Sign Out",
+                          style: TextStyle(color: Colors.red),
+                        ),
+                        trailing:
+                            const Icon(Icons.arrow_forward, color: Colors.red),
+                        onTap: widget.onSignOut,
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                  ],
+                ),
+              ),
+            ),
+            // Animated header - stacked blur layers for gradient effect
+            if (_titleOpacity > 0) ...[
+              // Layer 1 - strongest blur at very top
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: ClipRect(
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    heightFactor: 0.3,
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                      child: Container(height: 80, color: Colors.transparent),
+                    ),
+                  ),
+                ),
+              ),
+              // Layer 2
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: ClipRect(
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    heightFactor: 0.45,
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: Container(height: 80, color: Colors.transparent),
+                    ),
+                  ),
+                ),
+              ),
+              // Layer 3
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: ClipRect(
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    heightFactor: 0.6,
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+                      child: Container(height: 80, color: Colors.transparent),
+                    ),
+                  ),
+                ),
+              ),
+              // Layer 4
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: ClipRect(
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    heightFactor: 0.75,
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
+                      child: Container(height: 80, color: Colors.transparent),
+                    ),
+                  ),
+                ),
+              ),
+              // Layer 5
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: ClipRect(
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    heightFactor: 0.88,
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 1.5, sigmaY: 1.5),
+                      child: Container(height: 80, color: Colors.transparent),
+                    ),
+                  ),
+                ),
+              ),
+              // Layer 6 - barely any blur
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: ClipRect(
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    heightFactor: 0.97,
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 0.5, sigmaY: 0.5),
+                      child: Container(height: 80, color: Colors.transparent),
+                    ),
+                  ),
+                ),
+              ),
+              // Gradient overlay for color blending
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: IgnorePointer(
+                  child: Container(
+                    height: 80,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        stops: const [0.0, 0.5, 0.8, 1.0],
+                        colors: [
+                          Colors.black.withValues(alpha: 0.5),
+                          Colors.black.withValues(alpha: 0.2),
+                          Colors.black.withValues(alpha: 0.05),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+            // Text layer
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                bottom: false,
+                child: Opacity(
+                  opacity: _titleOpacity,
+                  child: Container(
+                    height: 56,
+                    alignment: Alignment.center,
+                    child: const Text(
+                      "Settings",
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
                       ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -650,7 +817,9 @@ class _PromptDetailPageState extends State<PromptDetailPage> {
                 ),
                 Icon(
                   isCompleted ? Icons.check_circle : Icons.circle_outlined,
-                  color: isCompleted ? Colors.green : Colors.grey,
+                  color: isCompleted
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.grey,
                   size: 32,
                 ),
               ],
@@ -686,7 +855,10 @@ class _PromptDetailPageState extends State<PromptDetailPage> {
                 label: Text(
                     isCompleted ? "Mark as Incomplete" : "Mark as Completed"),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isCompleted ? Colors.orange : Colors.green,
+                  backgroundColor: isCompleted
+                      ? Colors.grey[700]
+                      : Theme.of(context).colorScheme.primary,
+                  foregroundColor: Colors.white,
                 ),
               ),
             ),
@@ -711,7 +883,8 @@ class _PromptDetailPageState extends State<PromptDetailPage> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   filled: true,
-                  fillColor: Colors.grey[800],
+                  fillColor:
+                      Theme.of(context).colorScheme.surfaceContainerHighest,
                 ),
               ),
             ),
