@@ -82,12 +82,15 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late PageController _pageController;
   int _currentIndex = 0;
   late List<Map<String, String>> _todaysJourney;
   late Set<int> _completedToday;
   late AnimationController _pulseController;
+  AnimationController? _confettiController;
+  List<Map<String, dynamic>>? _confettiParticles;
+  bool _showConfetti = false;
 
   @override
   void initState() {
@@ -105,6 +108,7 @@ class _HomeScreenState extends State<HomeScreen>
   void dispose() {
     _pageController.dispose();
     _pulseController.dispose();
+    _confettiController?.dispose();
     super.dispose();
   }
 
@@ -114,8 +118,9 @@ class _HomeScreenState extends State<HomeScreen>
       dailyJourneyCompletion[_getTodayKey()] = _completedToday;
     });
 
-    // Auto-advance to next card if not the last one
-    if (index < _todaysJourney.length - 1) {
+    if (_allCompleted) {
+      _triggerConfetti();
+    } else if (index < _todaysJourney.length - 1) {
       Future.delayed(const Duration(milliseconds: 500), () {
         _pageController.nextPage(
           duration: const Duration(milliseconds: 400),
@@ -123,6 +128,42 @@ class _HomeScreenState extends State<HomeScreen>
         );
       });
     }
+  }
+
+  void _triggerConfetti() {
+    _confettiController?.dispose();
+    _confettiParticles = _generateConfettiParticles();
+    _confettiController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3500),
+    );
+    setState(() => _showConfetti = true);
+    _confettiController!.forward().whenComplete(() {
+      if (mounted) setState(() => _showConfetti = false);
+    });
+  }
+
+  List<Map<String, dynamic>> _generateConfettiParticles() {
+    final rand = Random();
+    final colors = [
+      const Color(0xFFE53935),
+      const Color(0xFF1E88E5),
+      const Color(0xFF43A047),
+      const Color(0xFFFDD835),
+      const Color(0xFF8E24AA),
+      const Color(0xFFFB8C00),
+      const Color(0xFFD81B60),
+      const Color(0xFF00ACC1),
+    ];
+    return List.generate(70, (_) => {
+      'x': rand.nextDouble(),
+      'delay': rand.nextDouble() * 0.4,
+      'color': colors[rand.nextInt(colors.length)],
+      'size': 6.0 + rand.nextDouble() * 10.0,
+      'rotation': rand.nextDouble() * pi * 2,
+      'driftX': (rand.nextDouble() - 0.5) * 0.3,
+      'isCircle': rand.nextBool(),
+    });
   }
 
   void _markIncomplete(int index) {
@@ -138,8 +179,10 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Column(
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Column(
           children: [
             const SizedBox(height: 20),
             // Header with progress
@@ -309,6 +352,23 @@ class _HomeScreenState extends State<HomeScreen>
             const SizedBox(height: 100), // Space for nav bar
           ],
         ),
+          ),
+          if (_showConfetti)
+            IgnorePointer(
+              child: AnimatedBuilder(
+                animation: _confettiController!,
+                builder: (context, child) {
+                  return CustomPaint(
+                    painter: _ConfettiPainter(
+                      _confettiParticles!,
+                      _confettiController!.value,
+                    ),
+                    child: const SizedBox.expand(),
+                  );
+                },
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -469,4 +529,66 @@ class _HomeScreenState extends State<HomeScreen>
       ),
     );
   }
+}
+
+class _ConfettiPainter extends CustomPainter {
+  final List<Map<String, dynamic>> particles;
+  final double progress;
+
+  _ConfettiPainter(this.particles, this.progress);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final p in particles) {
+      final delay = p['delay'] as double;
+      if (progress < delay) continue;
+
+      final localProgress =
+          ((progress - delay) / (1.0 - delay)).clamp(0.0, 1.0);
+
+      // Gravity-like easing: slow at top, accelerates downward
+      final easedY = Curves.easeIn.transform(localProgress);
+
+      // Gentle horizontal sine drift
+      final driftX =
+          (p['driftX'] as double) * sin(localProgress * pi * 2) * size.width;
+
+      final x = size.width * (p['x'] as double) + driftX;
+      final y = -30.0 + (size.height + 60.0) * easedY;
+
+      // Fade out over the last 20% of this particle's life
+      final opacity = localProgress > 0.8
+          ? 1.0 - ((localProgress - 0.8) / 0.2).clamp(0.0, 1.0)
+          : 1.0;
+
+      final paint = Paint()
+        ..color = (p['color'] as Color).withOpacity(opacity)
+        ..style = PaintingStyle.fill;
+
+      final particleSize = p['size'] as double;
+      final rotation =
+          (p['rotation'] as double) + localProgress * pi * 8;
+
+      canvas.save();
+      canvas.translate(x, y);
+      canvas.rotate(rotation);
+
+      if (p['isCircle'] as bool) {
+        canvas.drawCircle(Offset.zero, particleSize / 2.5, paint);
+      } else {
+        canvas.drawRect(
+          Rect.fromLTWH(
+              -particleSize / 2, -particleSize * 0.3, particleSize,
+              particleSize * 0.6),
+          paint,
+        );
+      }
+
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ConfettiPainter oldDelegate) =>
+      progress != oldDelegate.progress;
 }
