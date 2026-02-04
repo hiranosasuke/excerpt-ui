@@ -209,39 +209,50 @@ class _LibraryScreenState extends State<LibraryScreen> {
       appBar: AppBar(title: const Text("Library")),
       body: ListView.builder(
         itemCount: prompts.length,
+        padding: const EdgeInsets.fromLTRB(
+            12, 12, 12, 112), // more bottom padding for tab bar
         itemBuilder: (context, i) {
           final p = prompts[i];
           final isCompleted = promptCompletion[i] ?? false;
-          return ListTile(
-            title: Text(
-              p["text"]!,
-              style: TextStyle(
-                decoration: isCompleted ? TextDecoration.lineThrough : null,
-                color: isCompleted
-                    ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
-                    : Theme.of(context).colorScheme.onSurface,
-              ),
+          return Card(
+            margin: const EdgeInsets.symmetric(vertical: 8),
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
             ),
-            subtitle: Text(p["book"]!),
-            leading: isCompleted
-                ? Icon(
-                    Icons.check_circle,
-                    color: Theme.of(context).colorScheme.primary,
-                  )
-                : null,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => PromptDetailPage(
-                    index: i,
-                    book: p["book"]!,
-                    text: p["text"]!,
-                    onStatusChanged: () => setState(() {}),
-                  ),
+            child: ListTile(
+              contentPadding:
+                  const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+              title: Text(
+                p["text"]!,
+                style: TextStyle(
+                  decoration: isCompleted ? TextDecoration.lineThrough : null,
+                  color: isCompleted
+                      ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
+                      : Theme.of(context).colorScheme.onSurface,
                 ),
-              );
-            },
+              ),
+              subtitle: Text(p["book"]!),
+              leading: isCompleted
+                  ? Icon(
+                      Icons.check_circle,
+                      color: Theme.of(context).colorScheme.primary,
+                    )
+                  : null,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => PromptDetailPage(
+                      index: i,
+                      book: p["book"]!,
+                      text: p["text"]!,
+                      onStatusChanged: () => setState(() {}),
+                    ),
+                  ),
+                );
+              },
+            ),
           );
         },
       ),
@@ -729,31 +740,49 @@ class _PromptDetailPageState extends State<PromptDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Excerpt text (match Today page)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, bottom: 12),
+              child: Text(
+                widget.text,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  height: 1.3,
+                  color: isCompleted
+                      ? Theme.of(context).colorScheme.onSurface.withOpacity(0.7)
+                      : Theme.of(context).colorScheme.onSurface,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            // Book source (match Today page)
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Expanded(
+                Icon(
+                  Icons.menu_book,
+                  size: 16,
+                  color:
+                      Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
                   child: Text(
-                    widget.text,
-                    style: const TextStyle(
-                        fontSize: 28, fontWeight: FontWeight.bold),
-                    textAlign: TextAlign.center,
+                    widget.book,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withOpacity(0.5),
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                Icon(
-                  isCompleted ? Icons.check_circle : Icons.circle_outlined,
-                  color: isCompleted
-                      ? Theme.of(context).colorScheme.primary
-                      : Colors.grey,
-                  size: 32,
-                ),
               ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              widget.book,
-              style: const TextStyle(fontSize: 16),
-              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
             SizedBox(
