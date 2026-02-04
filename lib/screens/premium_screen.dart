@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../toast.dart';
 
 class PremiumScreen extends StatefulWidget {
   const PremiumScreen({super.key});
@@ -223,12 +224,9 @@ class _PremiumScreenState extends State<PremiumScreen> {
                     child: ElevatedButton(
                       onPressed: () {
                         // TODO: Implement purchase
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Starting ${_selectedPlan == 'annual' ? 'annual' : 'monthly'} subscription...',
-                            ),
-                          ),
+                        showToast(
+                          context,
+                          'Starting ${_selectedPlan == 'annual' ? 'annual' : 'monthly'} subscription...',
                         );
                       },
                       style: ElevatedButton.styleFrom(

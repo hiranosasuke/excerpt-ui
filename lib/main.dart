@@ -6,6 +6,7 @@ import 'screens/sign_in_page.dart';
 import 'screens/home_screen.dart';
 import 'screens/streak_screen.dart';
 import 'screens/premium_screen.dart';
+import 'toast.dart';
 
 void main() {
   runApp(const DailyBeliefsApp());
@@ -795,12 +796,11 @@ class _PromptDetailPageState extends State<PromptDetailPage> {
                         !(promptCompletion[widget.index] ?? false);
                   });
                   widget.onStatusChanged();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(isCompleted
-                          ? "Marked as incomplete"
-                          : "Great job! Marked as completed!"),
-                    ),
+                  showToast(
+                    context,
+                    isCompleted
+                        ? "Marked as incomplete"
+                        : "Great job! Marked as completed!",
                   );
                   Navigator.pop(context);
                 },
@@ -847,9 +847,7 @@ class _PromptDetailPageState extends State<PromptDetailPage> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Notes saved!")),
-                  );
+                  showToast(context, "Notes saved!");
                   Navigator.pop(context);
                 },
                 child: const Text("Save Notes"),
@@ -1002,14 +1000,11 @@ class _DailyReminderScreenState extends State<DailyReminderScreen> {
                   child: ElevatedButton(
                     onPressed: () {
                       // TODO: Save reminder settings
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            _isReminderEnabled
-                                ? 'Reminder set for ${_reminderTime.format(context)}'
-                                : 'Reminder disabled',
-                          ),
-                        ),
+                      showToast(
+                        context,
+                        _isReminderEnabled
+                            ? 'Reminder set for ${_reminderTime.format(context)}'
+                            : 'Reminder disabled',
                       );
                       Navigator.pop(context);
                     },
