@@ -5,6 +5,7 @@ import 'theme.dart';
 import 'screens/sign_in_page.dart';
 import 'screens/home_screen.dart';
 import 'screens/streak_screen.dart';
+import 'screens/premium_screen.dart';
 
 void main() {
   runApp(const DailyBeliefsApp());
@@ -372,7 +373,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           Icons.arrow_forward,
                           color: Theme.of(context).colorScheme.primary,
                         ),
-                        onTap: () {},
+                        onTap: () {
+                          showCupertinoModalBottomSheet(
+                            context: context,
+                            backgroundColor:
+                                Theme.of(context).scaffoldBackgroundColor,
+                            topRadius: const Radius.circular(20),
+                            builder: (context) => const PremiumScreen(),
+                          );
+                        },
                       ),
                     ),
 
