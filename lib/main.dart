@@ -115,7 +115,7 @@ class CustomBottomNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = [
       {'icon': Icons.today, 'label': 'Today'},
-      {'icon': Icons.menu_book, 'label': 'Library'},
+      {'icon': Icons.history, 'label': 'History'},
       {'icon': Icons.local_fire_department, 'label': 'Streak'},
     ];
 
@@ -204,19 +204,111 @@ class LibraryScreen extends StatefulWidget {
 }
 
 class _LibraryScreenState extends State<LibraryScreen> {
+  String _formatDateKey(String key) {
+    final parts = key.split('-');
+    final year = int.parse(parts[0]);
+    final month = int.parse(parts[1]);
+    final day = int.parse(parts[2]);
+    final now = DateTime.now();
+    final todayKey = '${now.year}-${now.month}-${now.day}';
+    if (key == todayKey) return 'Today';
+    final yesterday = now.subtract(const Duration(days: 1));
+    final yesterdayKey =
+        '${yesterday.year}-${yesterday.month}-${yesterday.day}';
+    if (key == yesterdayKey) return 'Yesterday';
+    final months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return '${months[month - 1]} $day, $year';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Library")),
-      body: ListView.builder(
-        itemCount: prompts.length,
-        padding: const EdgeInsets.fromLTRB(
-            12, 12, 12, 112), // more bottom padding for tab bar
-        itemBuilder: (context, i) {
-          final p = prompts[i];
-          final isCompleted = promptCompletion[i] ?? false;
-          return Card(
-            margin: const EdgeInsets.symmetric(vertical: 8),
+      appBar: AppBar(title: const Text("History")),
+      body: _buildHistoryList(context),
+    );
+  }
+
+  Widget _buildHistoryList(BuildContext context) {
+    // Group entries by date
+    final grouped = <String, List<Map<String, dynamic>>>{};
+    for (final entry in checkInHistory) {
+      grouped.putIfAbsent(entry['date'] as String, () => []).add(entry);
+    }
+    // Sort dates newest first using parsed DateTime (not string compare)
+    final sortedDates = grouped.keys.toList()
+      ..sort((a, b) {
+        final aParts = a.split('-').map(int.parse).toList();
+        final bParts = b.split('-').map(int.parse).toList();
+        final aDate = DateTime(aParts[0], aParts[1], aParts[2]);
+        final bDate = DateTime(bParts[0], bParts[1], bParts[2]);
+        return bDate.compareTo(aDate);
+      });
+
+    if (sortedDates.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 100),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.history,
+                size: 48,
+                color:
+                    Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                "No check-ins yet",
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color:
+                      Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                "Your check-in history will appear here",
+                style: TextStyle(
+                  fontSize: 14,
+                  color:
+                      Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Flatten into date headers + entry cards
+    final items = <Widget>[];
+    for (final date in sortedDates) {
+      items.add(
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 16, 8, 4),
+          child: Text(
+            _formatDateKey(date),
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+              letterSpacing: 0.5,
+            ),
+          ),
+        ),
+      );
+      for (final entry in grouped[date]!) {
+        final promptIdx = entry['promptIndex'] as int;
+        final prompt = prompts[promptIdx];
+        final notes = entry['notes'] as String;
+        items.add(
+          Card(
+            margin: const EdgeInsets.symmetric(vertical: 4),
             elevation: 2,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
@@ -224,39 +316,39 @@ class _LibraryScreenState extends State<LibraryScreen> {
             child: ListTile(
               contentPadding:
                   const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
-              title: Text(
-                p["text"]!,
-                style: TextStyle(
-                  decoration: isCompleted ? TextDecoration.lineThrough : null,
-                  color: isCompleted
-                      ? Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
-                      : Theme.of(context).colorScheme.onSurface,
-                ),
+              leading: Icon(
+                Icons.check_circle,
+                color: Theme.of(context).colorScheme.primary,
               ),
-              subtitle: Text(p["book"]!),
-              leading: isCompleted
-                  ? Icon(
-                      Icons.check_circle,
-                      color: Theme.of(context).colorScheme.primary,
+              title: Text(prompt['text']!),
+              subtitle: notes.isNotEmpty
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(prompt['book']!),
+                        const SizedBox(height: 4),
+                        Text(
+                          notes,
+                          style: TextStyle(
+                            fontStyle: FontStyle.italic,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withOpacity(0.55),
+                          ),
+                        ),
+                      ],
                     )
-                  : null,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => PromptDetailPage(
-                      index: i,
-                      book: p["book"]!,
-                      text: p["text"]!,
-                      onStatusChanged: () => setState(() {}),
-                    ),
-                  ),
-                );
-              },
+                  : Text(prompt['book']!),
             ),
-          );
-        },
-      ),
+          ),
+        );
+      }
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 112),
+      children: items,
     );
   }
 }
@@ -685,172 +777,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                 ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class PromptDetailPage extends StatefulWidget {
-  final int index;
-  final String book;
-  final String text;
-  final VoidCallback onStatusChanged;
-
-  const PromptDetailPage({
-    super.key,
-    required this.index,
-    required this.book,
-    required this.text,
-    required this.onStatusChanged,
-  });
-
-  @override
-  State<PromptDetailPage> createState() => _PromptDetailPageState();
-}
-
-class _PromptDetailPageState extends State<PromptDetailPage> {
-  late TextEditingController _notesController;
-
-  @override
-  void initState() {
-    super.initState();
-    _notesController =
-        TextEditingController(text: promptNotes[widget.index] ?? '');
-  }
-
-  @override
-  void dispose() {
-    _notesController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isCompleted = promptCompletion[widget.index] ?? false;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Prompt Details"),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Excerpt text (match Today page)
-            Padding(
-              padding: const EdgeInsets.only(top: 8, bottom: 12),
-              child: Text(
-                widget.text,
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  height: 1.3,
-                  color: isCompleted
-                      ? Theme.of(context).colorScheme.onSurface.withOpacity(0.7)
-                      : Theme.of(context).colorScheme.onSurface,
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 4,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            // Book source (match Today page)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.menu_book,
-                  size: 16,
-                  color:
-                      Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-                ),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    widget.book,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withOpacity(0.5),
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  setState(() {
-                    promptCompletion[widget.index] =
-                        !(promptCompletion[widget.index] ?? false);
-                  });
-                  widget.onStatusChanged();
-                  showToast(
-                    context,
-                    isCompleted
-                        ? "Marked as incomplete"
-                        : "Great job! Marked as completed!",
-                  );
-                  Navigator.pop(context);
-                },
-                icon: Icon(
-                    isCompleted ? Icons.close_rounded : Icons.check_rounded),
-                label: Text(
-                    isCompleted ? "Mark as Incomplete" : "Mark as Completed"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: isCompleted
-                      ? Colors.grey[700]
-                      : Theme.of(context).colorScheme.primary,
-                  foregroundColor: Colors.white,
-                ),
-              ),
-            ),
-            const SizedBox(height: 32),
-            const Text(
-              "My Notes",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            Expanded(
-              child: TextField(
-                controller: _notesController,
-                onChanged: (value) {
-                  promptNotes[widget.index] = value;
-                },
-                maxLines: null,
-                expands: true,
-                textAlignVertical: TextAlignVertical.top,
-                decoration: InputDecoration(
-                  hintText: "Write your notes here...",
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  filled: true,
-                  fillColor:
-                      Theme.of(context).colorScheme.surfaceContainerHighest,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  showToast(context, "Notes saved!");
-                  Navigator.pop(context);
-                },
-                child: const Text("Save Notes"),
               ),
             ),
           ],
