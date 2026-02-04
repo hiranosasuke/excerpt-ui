@@ -418,7 +418,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             leading: const Icon(Icons.schedule),
                             title: const Text("Daily Reminder"),
                             trailing: const Icon(Icons.arrow_forward),
-                            onTap: () {},
+                            onTap: () {
+                              showCupertinoModalBottomSheet(
+                                context: context,
+                                backgroundColor:
+                                    Theme.of(context).scaffoldBackgroundColor,
+                                topRadius: const Radius.circular(20),
+                                builder: (context) =>
+                                    const DailyReminderScreen(),
+                              );
+                            },
                           ),
                           const Divider(height: 1),
                           ListTile(
@@ -818,6 +827,183 @@ class _PromptDetailPageState extends State<PromptDetailPage> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class DailyReminderScreen extends StatefulWidget {
+  const DailyReminderScreen({super.key});
+
+  @override
+  State<DailyReminderScreen> createState() => _DailyReminderScreenState();
+}
+
+class _DailyReminderScreenState extends State<DailyReminderScreen> {
+  TimeOfDay _reminderTime = const TimeOfDay(hour: 8, minute: 0);
+  bool _isReminderEnabled = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      child: Scaffold(
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Column(
+              children: [
+                const SizedBox(height: 40),
+                const Text(
+                  '⏰',
+                  style: TextStyle(fontSize: 60),
+                ),
+                const SizedBox(height: 32),
+                const Text(
+                  'Daily Reminder',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'When would you like to practice?',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withOpacity(0.7),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 40),
+                // Reminder toggle
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  decoration: BoxDecoration(
+                    color:
+                        Theme.of(context).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Enable Reminder',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Switch(
+                        value: _isReminderEnabled,
+                        onChanged: (value) {
+                          setState(() => _isReminderEnabled = value);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Time picker
+                AnimatedOpacity(
+                  opacity: _isReminderEnabled ? 1.0 : 0.4,
+                  duration: const Duration(milliseconds: 200),
+                  child: GestureDetector(
+                    onTap: _isReminderEnabled
+                        ? () async {
+                            final time = await showTimePicker(
+                              context: context,
+                              initialTime: _reminderTime,
+                            );
+                            if (time != null) {
+                              setState(() => _reminderTime = time);
+                            }
+                          }
+                        : null,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 32, vertical: 20),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.access_time,
+                            size: 32,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(width: 16),
+                          Text(
+                            _reminderTime.format(context),
+                            style: const TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Icon(
+                            Icons.edit,
+                            size: 20,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withOpacity(0.5),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                // Save button
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      // TODO: Save reminder settings
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            _isReminderEnabled
+                                ? 'Reminder set for ${_reminderTime.format(context)}'
+                                : 'Reminder disabled',
+                          ),
+                        ),
+                      );
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: const Text(
+                      'Save',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 40),
+              ],
+            ),
+          ),
         ),
       ),
     );
