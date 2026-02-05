@@ -469,10 +469,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       child: ListTile(
                         leading: Icon(
-                          Icons.card_giftcard,
+                          Icons.subscriptions,
                           color: Theme.of(context).colorScheme.primary,
                         ),
-                        title: const Text("Upgrade to Premium"),
+                        title: const Text("Manage Subscriptions"),
                         trailing: Icon(
                           Icons.arrow_forward,
                           color: Theme.of(context).colorScheme.primary,
@@ -512,10 +512,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       child: Column(
                         children: [
                           ListTile(
-                            leading: const Icon(Icons.book),
-                            title: const Text("Favorite Books"),
+                            leading: const Icon(Icons.tag_outlined),
+                            title: const Text("Interests"),
                             trailing: const Icon(Icons.arrow_forward),
-                            onTap: () {},
+                            onTap: () {
+                              showCupertinoModalBottomSheet(
+                                context: context,
+                                backgroundColor:
+                                    Theme.of(context).scaffoldBackgroundColor,
+                                topRadius: const Radius.circular(20),
+                                builder: (context) => const InterestsScreen(),
+                              );
+                            },
                           ),
                           const Divider(height: 1),
                           ListTile(
@@ -547,13 +555,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                             onTap: _toggleTheme,
                           ),
-                          const Divider(height: 1),
-                          ListTile(
-                            leading: const Icon(Icons.language),
-                            title: const Text("Language"),
-                            trailing: const Icon(Icons.arrow_forward),
-                            onTap: () {},
-                          ),
                         ],
                       ),
                     ),
@@ -580,13 +581,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       child: Column(
                         children: [
-                          ListTile(
-                            leading: const Icon(Icons.info),
-                            title: const Text("About Us"),
-                            trailing: const Icon(Icons.arrow_forward),
-                            onTap: () {},
-                          ),
-                          const Divider(height: 1),
                           ListTile(
                             leading: const Icon(Icons.help),
                             title: const Text("Help & Support"),
@@ -943,6 +937,151 @@ class _DailyReminderScreenState extends State<DailyReminderScreen> {
                     ),
                     child: const Text(
                       'Save',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 40),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class InterestsScreen extends StatefulWidget {
+  const InterestsScreen({super.key});
+
+  @override
+  State<InterestsScreen> createState() => _InterestsScreenState();
+}
+
+class _InterestsScreenState extends State<InterestsScreen> {
+  static final _options = <Map<String, String>>[
+    {'icon': '🧠', 'label': 'Mindset'},
+    {'icon': '🎨', 'label': 'Visualization'},
+    {'icon': '🤝', 'label': 'Connection'},
+    {'icon': '🔄', 'label': 'Habits'},
+    {'icon': '📋', 'label': 'Planning'},
+    {'icon': '🪞', 'label': 'Reflection'},
+    {'icon': '💭', 'label': 'Mindfulness'},
+    {'icon': '🎯', 'label': 'Focus'},
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      child: Scaffold(
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              children: [
+                const SizedBox(height: 40),
+                const Text(
+                  '✨',
+                  style: TextStyle(fontSize: 48),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Pick your interests',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Select the categories you enjoy',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withOpacity(0.7),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 36),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  alignment: WrapAlignment.center,
+                  children: _options.map((option) {
+                    final isSelected =
+                        selectedInterests.contains(option['label']);
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          if (isSelected) {
+                            selectedInterests.remove(option['label']);
+                          } else {
+                            selectedInterests.add(option['label']!);
+                          }
+                        });
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 18, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(30),
+                          border: Border.all(
+                            color: isSelected
+                                ? Theme.of(context).colorScheme.primary
+                                : Colors.transparent,
+                            width: 2,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(option['icon']!,
+                                style: const TextStyle(fontSize: 20)),
+                            const SizedBox(width: 8),
+                            Text(
+                              option['label']!,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: isSelected
+                                    ? Colors.white
+                                    : Theme.of(context).colorScheme.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const Spacer(),
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: const Text(
+                      'Done',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,

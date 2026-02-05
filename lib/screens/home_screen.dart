@@ -61,6 +61,9 @@ Map<String, Map<int, String>> dailyCheckInNotes = {};
 // Persistent check-in history: each entry is { 'date', 'promptIndex', 'notes' }
 List<Map<String, dynamic>> checkInHistory = [];
 
+// User-selected interest categories (set during onboarding, editable in Settings)
+Set<String> selectedInterests = {};
+
 String _getTodayKey() {
   final now = DateTime.now();
   return '${now.year}-${now.month}-${now.day}';

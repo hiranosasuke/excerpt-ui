@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'home_screen.dart';
 
 class SignInPage extends StatelessWidget {
   final VoidCallback onSignIn;
@@ -154,6 +155,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
         curve: Curves.easeOutCubic,
       );
     } else {
+      selectedInterests = _selectedTopics.toSet();
       Navigator.of(context).pop();
       widget.onComplete();
     }
