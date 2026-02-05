@@ -123,7 +123,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
                             context,
                             plan: 'monthly',
                             title: 'Monthly',
-                            price: '\$4.99',
+                            price: '\$2.99',
                             period: '/month',
                             isSelected: _selectedPlan == 'monthly',
                           ),
@@ -134,7 +134,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
                             context,
                             plan: 'annual',
                             title: 'Annual',
-                            price: '\$29.99',
+                            price: '\$24.99',
                             period: '/year',
                             isSelected: _selectedPlan == 'annual',
                             savings: 'Save 50%',
@@ -250,7 +250,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
                   const SizedBox(height: 12),
                   Text(
                     _selectedPlan == 'annual'
-                        ? '7-day free trial, then \$29.99/year'
+                        ? '7-day free trial, then \$24.99/year'
                         : 'Cancel anytime',
                     style: TextStyle(
                       fontSize: 14,
@@ -386,7 +386,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
                 if (plan == 'annual') ...[
                   const SizedBox(height: 4),
                   Text(
-                    '\$2.50/month',
+                    '\$2.08/month',
                     style: TextStyle(
                       fontSize: 12,
                       color: Theme.of(context)

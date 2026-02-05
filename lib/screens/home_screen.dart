@@ -80,8 +80,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen>
-    with TickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late PageController _pageController;
   int _currentIndex = 0;
   late Set<int> _completedToday;
@@ -161,15 +160,17 @@ class _HomeScreenState extends State<HomeScreen>
       const Color(0xFFD81B60),
       const Color(0xFF00ACC1),
     ];
-    return List.generate(70, (_) => {
-      'x': rand.nextDouble(),
-      'delay': rand.nextDouble() * 0.4,
-      'color': colors[rand.nextInt(colors.length)],
-      'size': 6.0 + rand.nextDouble() * 10.0,
-      'rotation': rand.nextDouble() * pi * 2,
-      'driftX': (rand.nextDouble() - 0.5) * 0.3,
-      'isCircle': rand.nextBool(),
-    });
+    return List.generate(
+        70,
+        (_) => {
+              'x': rand.nextDouble(),
+              'delay': rand.nextDouble() * 0.4,
+              'color': colors[rand.nextInt(colors.length)],
+              'size': 6.0 + rand.nextDouble() * 10.0,
+              'rotation': rand.nextDouble() * pi * 2,
+              'driftX': (rand.nextDouble() - 0.5) * 0.3,
+              'isCircle': rand.nextBool(),
+            });
   }
 
   void _markIncomplete(int index) {
@@ -189,7 +190,8 @@ class _HomeScreenState extends State<HomeScreen>
 
     final currentActive = activeExcerptIndices.toSet();
     final pool = List.generate(prompts.length, (i) => i)
-        .where((i) => !currentActive.contains(i) && !retiredExcerptIndices.contains(i))
+        .where((i) =>
+            !currentActive.contains(i) && !retiredExcerptIndices.contains(i))
         .toList();
 
     if (pool.isEmpty) {
@@ -199,8 +201,8 @@ class _HomeScreenState extends State<HomeScreen>
 
     final replacement = pool[Random().nextInt(pool.length)];
 
-    checkInHistory.removeWhere((e) =>
-        e['date'] == _getTodayKey() && e['promptIndex'] == retiredIndex);
+    checkInHistory.removeWhere(
+        (e) => e['date'] == _getTodayKey() && e['promptIndex'] == retiredIndex);
 
     setState(() {
       activeExcerptIndices[slotIndex] = replacement;
@@ -249,7 +251,8 @@ class _HomeScreenState extends State<HomeScreen>
 
   void _saveNotesForSlot(int slotIndex, String notes) {
     setState(() {
-      dailyCheckInNotes.putIfAbsent(_getTodayKey(), () => {})[slotIndex] = notes;
+      dailyCheckInNotes.putIfAbsent(_getTodayKey(), () => {})[slotIndex] =
+          notes;
     });
 
     final idx = checkInHistory.indexWhere((e) =>
@@ -348,7 +351,8 @@ class _HomeScreenState extends State<HomeScreen>
                       // Step indicators
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: List.generate(activeExcerptIndices.length, (index) {
+                        children:
+                            List.generate(activeExcerptIndices.length, (index) {
                           final isCompleted = _completedToday.contains(index);
                           final isCurrent = index == _currentIndex;
                           return GestureDetector(
@@ -369,7 +373,9 @@ class _HomeScreenState extends State<HomeScreen>
                                     height: isCurrent ? 44 : 36,
                                     decoration: BoxDecoration(
                                       color: isCompleted
-                                          ? Theme.of(context).colorScheme.primary
+                                          ? Theme.of(context)
+                                              .colorScheme
+                                              .primary
                                           : isCurrent
                                               ? Theme.of(context)
                                                   .colorScheme
@@ -414,7 +420,8 @@ class _HomeScreenState extends State<HomeScreen>
                                     width: isCurrent ? 24 : 0,
                                     height: 3,
                                     decoration: BoxDecoration(
-                                      color: Theme.of(context).colorScheme.primary,
+                                      color:
+                                          Theme.of(context).colorScheme.primary,
                                       borderRadius: BorderRadius.circular(2),
                                     ),
                                   ),
@@ -432,7 +439,8 @@ class _HomeScreenState extends State<HomeScreen>
                 Expanded(
                   child: PageView.builder(
                     controller: _pageController,
-                    onPageChanged: (index) => setState(() => _currentIndex = index),
+                    onPageChanged: (index) =>
+                        setState(() => _currentIndex = index),
                     itemCount: activeExcerptIndices.length,
                     itemBuilder: (context, index) {
                       return AnimatedBuilder(
@@ -484,7 +492,7 @@ class _HomeScreenState extends State<HomeScreen>
     final hasNotes = _getNotesForSlot(slotIndex).isNotEmpty;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+      margin: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
         gradient: isCheckedIn
             ? LinearGradient(
@@ -521,11 +529,9 @@ class _HomeScreenState extends State<HomeScreen>
           children: [
             // Category badge
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
-                color:
-                    Theme.of(context).colorScheme.primary.withOpacity(0.15),
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -538,32 +544,18 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             ),
             const SizedBox(height: 16),
-            // Checked-in indicator
-            if (isCheckedIn)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Icon(
-                  Icons.check_circle,
-                  color: Theme.of(context).colorScheme.primary,
-                  size: 36,
-                ),
-              ),
             // Excerpt text
-            Flexible(
-              child: Text(
-                excerpt["text"] ?? "",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  height: 1.3,
-                  color: isCheckedIn
-                      ? Theme.of(context).colorScheme.onSurface.withOpacity(0.7)
-                      : Theme.of(context).colorScheme.onSurface,
-                ),
-                textAlign: TextAlign.center,
-                overflow: TextOverflow.ellipsis,
-                maxLines: 4,
+            Text(
+              excerpt["text"] ?? "",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                height: 1.3,
+                color: isCheckedIn
+                    ? Theme.of(context).colorScheme.onSurface.withOpacity(0.7)
+                    : Theme.of(context).colorScheme.onSurface,
               ),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
             // Book source
@@ -577,17 +569,14 @@ class _HomeScreenState extends State<HomeScreen>
                       Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                 ),
                 const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    excerpt["book"] ?? "",
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withOpacity(0.5),
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                Text(
+                  excerpt["book"] ?? "",
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withOpacity(0.5),
                   ),
                 ),
               ],
@@ -687,10 +676,8 @@ class _HomeScreenState extends State<HomeScreen>
               child: TextButton(
                 onPressed: () => _confirmRetire(slotIndex),
                 style: TextButton.styleFrom(
-                  foregroundColor: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withOpacity(0.45),
+                  foregroundColor:
+                      Theme.of(context).colorScheme.onSurface.withOpacity(0.45),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -750,8 +737,7 @@ class _ConfettiPainter extends CustomPainter {
         ..style = PaintingStyle.fill;
 
       final particleSize = p['size'] as double;
-      final rotation =
-          (p['rotation'] as double) + localProgress * pi * 8;
+      final rotation = (p['rotation'] as double) + localProgress * pi * 8;
 
       canvas.save();
       canvas.translate(x, y);
@@ -761,8 +747,7 @@ class _ConfettiPainter extends CustomPainter {
         canvas.drawCircle(Offset.zero, particleSize / 2.5, paint);
       } else {
         canvas.drawRect(
-          Rect.fromLTWH(
-              -particleSize / 2, -particleSize * 0.3, particleSize,
+          Rect.fromLTWH(-particleSize / 2, -particleSize * 0.3, particleSize,
               particleSize * 0.6),
           paint,
         );
@@ -810,7 +795,8 @@ class _CheckInNotesSheetState extends State<_CheckInNotesSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -823,10 +809,8 @@ class _CheckInNotesSheetState extends State<_CheckInNotesSheet> {
                 width: 36,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withOpacity(0.25),
+                  color:
+                      Theme.of(context).colorScheme.onSurface.withOpacity(0.25),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -870,8 +854,7 @@ class _CheckInNotesSheetState extends State<_CheckInNotesSheet> {
                   child: ElevatedButton(
                     onPressed: () => widget.onSave(_controller.text),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor:
-                          Theme.of(context).colorScheme.primary,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
