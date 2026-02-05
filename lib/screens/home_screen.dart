@@ -569,14 +569,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  excerpt["book"] ?? "",
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withOpacity(0.5),
+                Flexible(
+                  child: Text(
+                    excerpt["book"] ?? "",
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withOpacity(0.5),
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
