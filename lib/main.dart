@@ -482,6 +482,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     widget.onThemeChanged?.call();
   }
 
+  void _showDeleteAccountModal(BuildContext context) {
+    showCupertinoModalBottomSheet(
+      context: context,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      topRadius: const Radius.circular(20),
+      builder: (context) => DeleteAccountScreen(
+        onDeleted: () {
+          Navigator.pop(context);
+          widget.onSignOut();
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
@@ -686,6 +700,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         trailing:
                             const Icon(Icons.arrow_forward, color: Colors.red),
                         onTap: widget.onSignOut,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.red.withOpacity(0.3)),
+                      ),
+                      child: ListTile(
+                        leading: const Icon(Icons.delete_forever, color: Colors.red),
+                        title: const Text(
+                          "Delete Account",
+                          style: TextStyle(color: Colors.red),
+                        ),
+                        trailing:
+                            const Icon(Icons.arrow_forward, color: Colors.red),
+                        onTap: () => _showDeleteAccountModal(context),
                       ),
                     ),
                     const SizedBox(height: 32),
@@ -1223,6 +1255,203 @@ class _InterestsScreenState extends State<InterestsScreen> {
                 ),
                 const SizedBox(height: 40),
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class DeleteAccountScreen extends StatefulWidget {
+  final VoidCallback onDeleted;
+
+  const DeleteAccountScreen({super.key, required this.onDeleted});
+
+  @override
+  State<DeleteAccountScreen> createState() => _DeleteAccountScreenState();
+}
+
+class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
+  final _reasonController = TextEditingController();
+  bool _isDeleting = false;
+  String? _errorText;
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _deleteAccount() async {
+    if (_reasonController.text.trim().isEmpty) {
+      setState(() {
+        _errorText = "Please provide a reason";
+      });
+      return;
+    }
+
+    setState(() {
+      _isDeleting = true;
+      _errorText = null;
+    });
+
+    final userId = AuthService.userId;
+    if (userId == null) {
+      Navigator.pop(context);
+      return;
+    }
+
+    try {
+      await ApiService.deleteAccount(
+        userId,
+        _reasonController.text.trim(),
+      );
+      if (!mounted) return;
+      showToast(context, "Account deleted successfully");
+      widget.onDeleted();
+    } catch (e) {
+      setState(() {
+        _isDeleting = false;
+        _errorText = "Failed to delete account. Please try again.";
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      child: Scaffold(
+        resizeToAvoidBottomInset: false,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: SingleChildScrollView(
+              padding: EdgeInsets.only(bottom: bottomInset + 40),
+              child: Column(
+                children: [
+                  const SizedBox(height: 40),
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    size: 60,
+                    color: Colors.red,
+                  ),
+                  const SizedBox(height: 32),
+                  const Text(
+                    'Delete Account',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "We're sorry to see you go. Please let us know why you're leaving.",
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withOpacity(0.7),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 32),
+                  TextField(
+                    controller: _reasonController,
+                    maxLines: 4,
+                    decoration: InputDecoration(
+                      hintText: "Your reason for leaving (required)",
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      filled: true,
+                      fillColor:
+                          Theme.of(context).colorScheme.surfaceContainerHighest,
+                      errorText: _errorText,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.red.withOpacity(0.3)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.red, size: 20),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            "This action cannot be undone. All your data will be permanently deleted.",
+                            style: TextStyle(fontSize: 13, color: Colors.red),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed:
+                              _isDeleting ? null : () => Navigator.pop(context),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _isDeleting ? null : _deleteAccount,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: _isDeleting
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text(
+                                  'Delete',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),

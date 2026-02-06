@@ -343,4 +343,17 @@ class ApiService {
       throw Exception('Failed to set goal');
     }
   }
+
+  // ============ ACCOUNT ============
+
+  static Future<void> deleteAccount(String userId, String reason) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/users/$userId'),
+      headers: _headers,
+      body: jsonEncode({'reason': reason}),
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Failed to delete account');
+    }
+  }
 }
