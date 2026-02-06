@@ -281,11 +281,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       final replacement = replacements.first;
       await ApiService.setActiveExcerpt(userId, slotIndex, replacement.id);
 
-      // Delete any check-in for this slot today
-      final checkInId = _slotCheckInIds[slotIndex];
-      if (checkInId != null) {
-        await ApiService.deleteCheckIn(checkInId);
-      }
+      // Keep check-in history - don't delete when mastering
 
       setState(() {
         _activeExcerpts[slotIndex] = replacement;
