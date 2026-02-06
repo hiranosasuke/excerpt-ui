@@ -857,9 +857,49 @@ class DailyReminderScreen extends StatefulWidget {
 class _DailyReminderScreenState extends State<DailyReminderScreen> {
   TimeOfDay _reminderTime = const TimeOfDay(hour: 8, minute: 0);
   bool _isReminderEnabled = true;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedReminder();
+  }
+
+  Future<void> _loadSavedReminder() async {
+    final userId = AuthService.userId;
+    if (userId == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    try {
+      final settings = await ApiService.getSettings(userId);
+      final hour = settings['reminder_hour'];
+      final minute = settings['reminder_minute'];
+
+      if (mounted) {
+        setState(() {
+          if (hour != null && minute != null) {
+            _reminderTime = TimeOfDay(hour: hour, minute: minute);
+            _isReminderEnabled = true;
+          } else {
+            _isReminderEnabled = false;
+          }
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       child: Scaffold(
