@@ -1,17 +1,58 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
+import '../services/auth_service.dart';
+import '../services/api_service.dart';
 
-class SignInPage extends StatelessWidget {
+class SignInPage extends StatefulWidget {
   final VoidCallback onSignIn;
 
   const SignInPage({super.key, required this.onSignIn});
 
+  @override
+  State<SignInPage> createState() => _SignInPageState();
+}
+
+class _SignInPageState extends State<SignInPage> {
+  bool _isLoading = false;
+
   void _startOnboarding(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => OnboardingFlow(onComplete: onSignIn),
+        builder: (context) => OnboardingFlow(onComplete: widget.onSignIn),
       ),
     );
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() => _isLoading = true);
+    try {
+      await AuthService.signInWithGoogle();
+      // OAuth will redirect, auth state listener in main.dart will handle the rest
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Sign in failed: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _signInWithApple() async {
+    setState(() => _isLoading = true);
+    try {
+      await AuthService.signInWithApple();
+      // Native sign-in complete, auth state listener in main.dart will handle navigation
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Sign in failed: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -34,13 +75,19 @@ class SignInPage extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 60),
-              // Google Sign In Button (Quick bypass for testing)
+              // Google Sign In Button
               SizedBox(
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton.icon(
-                  onPressed: onSignIn,
-                  icon: const Text("🔍", style: TextStyle(fontSize: 24)),
+                  onPressed: _isLoading ? null : _signInWithGoogle,
+                  icon: _isLoading
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text("G", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
                   label: const Text("Sign in with Google"),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
@@ -52,12 +99,12 @@ class SignInPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              // Apple Sign In Button (Full onboarding)
+              // Apple Sign In Button
               SizedBox(
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton.icon(
-                  onPressed: () => _startOnboarding(context),
+                  onPressed: _isLoading ? null : _signInWithApple,
                   icon: const Text("", style: TextStyle(fontSize: 24)),
                   label: const Text("Sign in with Apple"),
                   style: ElevatedButton.styleFrom(
@@ -98,6 +145,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
   String _selectedGoal = '';
   final Set<String> _selectedTopics = {};
   TimeOfDay _reminderTime = const TimeOfDay(hour: 8, minute: 0);
+  bool _isSaving = false;
 
   final List<Map<String, dynamic>> _onboardingPages = [
     {
@@ -148,15 +196,47 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
     },
   ];
 
-  void _nextPage() {
+  Future<void> _nextPage() async {
     if (_currentPage < _onboardingPages.length - 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 400),
         curve: Curves.easeOutCubic,
       );
     } else {
+      // Save all onboarding data to API
+      setState(() => _isSaving = true);
+
+      final userId = AuthService.userId;
+      if (userId != null) {
+        try {
+          // Save goal
+          if (_selectedGoal.isNotEmpty) {
+            await ApiService.setGoal(userId, _selectedGoal);
+          }
+
+          // Save interests
+          if (_selectedTopics.isNotEmpty) {
+            await ApiService.setInterests(userId, _selectedTopics.toList());
+          }
+
+          // Save reminder
+          await ApiService.setReminder(userId, _reminderTime.hour, _reminderTime.minute);
+
+          // Fetch and set initial active excerpts
+          final randomExcerpts = await ApiService.getRandomExcerpts(count: 3);
+          if (randomExcerpts.isNotEmpty) {
+            final bulkData = randomExcerpts.asMap().entries.map((e) => {
+              'slotIndex': e.key,
+              'excerptId': e.value.id,
+            }).toList();
+            await ApiService.setActiveExcerptsBulk(userId, bulkData);
+          }
+        } catch (e) {
+          // Continue even if some saves fail - user can update later in settings
+        }
+      }
+
       selectedInterests = _selectedTopics.toSet();
-      Navigator.of(context).pop();
       widget.onComplete();
     }
   }
@@ -248,7 +328,7 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: _canProceed() ? _nextPage : null,
+                  onPressed: (_canProceed() && !_isSaving) ? _nextPage : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.primary,
                     foregroundColor: Colors.white,
@@ -258,15 +338,24 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
-                  child: Text(
-                    _currentPage == _onboardingPages.length - 1
-                        ? "Let's Go!"
-                        : "Continue",
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          _currentPage == _onboardingPages.length - 1
+                              ? "Let's Go!"
+                              : "Continue",
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                 ),
               ),
             ),

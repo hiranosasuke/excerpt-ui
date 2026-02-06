@@ -1,9 +1,21 @@
 import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
+import '../services/api_service.dart';
+import '../models/user_streak.dart';
 
-class StreakScreen extends StatelessWidget {
+class StreakScreen extends StatefulWidget {
   const StreakScreen({super.key});
 
-  // Sample leaderboard data
+  @override
+  State<StreakScreen> createState() => _StreakScreenState();
+}
+
+class _StreakScreenState extends State<StreakScreen> {
+  UserStreak? _streak;
+  bool _isLoading = true;
+  String? _error;
+
+  // Sample leaderboard data (placeholder - API doesn't have leaderboard endpoint yet)
   static const List<Map<String, dynamic>> leaderboard = [
     {'name': 'Sarah M.', 'streak': 45, 'isCurrentUser': false},
     {'name': 'Alex K.', 'streak': 32, 'isCurrentUser': false},
@@ -12,15 +24,60 @@ class StreakScreen extends StatelessWidget {
     {'name': 'Morgan P.', 'streak': 18, 'isCurrentUser': false},
     {'name': 'Riley S.', 'streak': 14, 'isCurrentUser': false},
     {'name': 'Quinn D.', 'streak': 9, 'isCurrentUser': false},
-    {'name': 'You', 'streak': 3, 'isCurrentUser': true},
-    {'name': 'Casey R.', 'streak': 2, 'isCurrentUser': false},
-    {'name': 'Jamie T.', 'streak': 1, 'isCurrentUser': false},
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadStreak();
+  }
+
+  Future<void> _loadStreak() async {
+    final userId = AuthService.userId;
+    if (userId == null) {
+      setState(() {
+        _error = 'Not signed in';
+        _isLoading = false;
+      });
+      return;
+    }
+
+    try {
+      final streak = await ApiService.getStreak(userId);
+      setState(() {
+        _streak = streak;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  List<Map<String, dynamic>> _getLeaderboardWithUser() {
+    final currentStreak = _streak?.currentStreak ?? 0;
+    final allEntries = [
+      ...leaderboard,
+      {'name': 'You', 'streak': currentStreak, 'isCurrentUser': true},
+    ];
+    allEntries.sort((a, b) => (b['streak'] as int).compareTo(a['streak'] as int));
+    return allEntries;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    const currentStreak = 3;
-    const longestStreak = 7;
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(title: const Text("Streak")),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final currentStreak = _streak?.currentStreak ?? 0;
+    final longestStreak = _streak?.longestStreak ?? 0;
+    final leaderboardWithUser = _getLeaderboardWithUser();
 
     return Scaffold(
       appBar: AppBar(title: const Text("Streak")),
@@ -50,9 +107,9 @@ class StreakScreen extends StatelessWidget {
                     style: TextStyle(fontSize: 56),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     '$currentStreak',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 64,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
@@ -75,9 +132,9 @@ class StreakScreen extends StatelessWidget {
                       color: Colors.white.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Longest: $longestStreak days',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 14,
                         color: Colors.white,
                       ),
@@ -106,13 +163,13 @@ class StreakScreen extends StatelessWidget {
             ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: leaderboard.length,
+              itemCount: leaderboardWithUser.length,
               separatorBuilder: (context, index) => Divider(
                 height: 1,
                 color: Theme.of(context).dividerColor.withOpacity(0.2),
               ),
               itemBuilder: (context, index) {
-                final entry = leaderboard[index];
+                final entry = leaderboardWithUser[index];
                 final isCurrentUser = entry['isCurrentUser'] as bool;
                 final rank = index + 1;
 

@@ -7,8 +7,12 @@ import 'screens/home_screen.dart';
 import 'screens/streak_screen.dart';
 import 'screens/premium_screen.dart';
 import 'toast.dart';
+import 'services/auth_service.dart';
+import 'services/api_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await AuthService.initialize();
   runApp(const DailyBeliefsApp());
 }
 
@@ -20,25 +24,95 @@ class DailyBeliefsApp extends StatefulWidget {
 }
 
 class _DailyBeliefsAppState extends State<DailyBeliefsApp> {
-  bool isSignedIn = false;
+  bool _isLoading = true;
+  bool _isSignedIn = false;
+  bool _needsOnboarding = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAuthState();
+    // Listen for auth state changes
+    AuthService.authStateChanges.listen((state) async {
+      final isSignedIn = state.session != null;
+      if (isSignedIn && !_isSignedIn) {
+        // User just signed in, check if they need onboarding
+        await _checkIfNeedsOnboarding();
+      }
+      setState(() {
+        _isSignedIn = isSignedIn;
+      });
+    });
+  }
+
+  Future<void> _checkAuthState() async {
+    final isSignedIn = AuthService.currentUser != null;
+    if (isSignedIn) {
+      await _checkIfNeedsOnboarding();
+    }
+    setState(() {
+      _isSignedIn = isSignedIn;
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _checkIfNeedsOnboarding() async {
+    final userId = AuthService.userId;
+    if (userId == null) return;
+
+    try {
+      // Create user if needed
+      await ApiService.createUser(userId);
+      // Check if user has active excerpts - if not, they need onboarding
+      final activeExcerpts = await ApiService.getActiveExcerpts(userId);
+      _needsOnboarding = activeExcerpts.isEmpty;
+    } catch (e) {
+      // If we can't check, assume they need onboarding
+      _needsOnboarding = true;
+    }
+  }
+
+  void _completeOnboarding() {
+    setState(() {
+      _needsOnboarding = false;
+    });
+  }
 
   void _onThemeChanged() {
     setState(() {});
   }
 
+  Future<void> _handleSignOut() async {
+    await AuthService.signOut();
+    setState(() => _isSignedIn = false);
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return MaterialApp(
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: AppTheme.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+        home: const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+
     return MaterialApp(
       title: 'Daily Beliefs',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: AppTheme.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-      home: isSignedIn
-          ? RootScreen(
-              onSignOut: () => setState(() => isSignedIn = false),
-              onThemeChanged: _onThemeChanged,
-            )
-          : SignInPage(onSignIn: () => setState(() => isSignedIn = true)),
+      home: _isSignedIn
+          ? (_needsOnboarding
+              ? OnboardingFlow(onComplete: _completeOnboarding)
+              : RootScreen(
+                  onSignOut: _handleSignOut,
+                  onThemeChanged: _onThemeChanged,
+                ))
+          : SignInPage(onSignIn: () => setState(() => _isSignedIn = true)),
     );
   }
 }
@@ -210,11 +284,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
     final month = int.parse(parts[1]);
     final day = int.parse(parts[2]);
     final now = DateTime.now();
-    final todayKey = '${now.year}-${now.month}-${now.day}';
+    final todayKey = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     if (key == todayKey) return 'Today';
     final yesterday = now.subtract(const Duration(days: 1));
     final yesterdayKey =
-        '${yesterday.year}-${yesterday.month}-${yesterday.day}';
+        '${yesterday.year}-${yesterday.month.toString().padLeft(2, '0')}-${yesterday.day.toString().padLeft(2, '0')}';
     if (key == yesterdayKey) return 'Yesterday';
     final months = [
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -232,20 +306,14 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   Widget _buildHistoryList(BuildContext context) {
-    // Group entries by date
-    final grouped = <String, List<Map<String, dynamic>>>{};
+    // Group entries by date using CheckIn objects from home_screen
+    final grouped = <String, List<dynamic>>{};
     for (final entry in checkInHistory) {
-      grouped.putIfAbsent(entry['date'] as String, () => []).add(entry);
+      grouped.putIfAbsent(entry.checkInDate, () => []).add(entry);
     }
-    // Sort dates newest first using parsed DateTime (not string compare)
+    // Sort dates newest first
     final sortedDates = grouped.keys.toList()
-      ..sort((a, b) {
-        final aParts = a.split('-').map(int.parse).toList();
-        final bParts = b.split('-').map(int.parse).toList();
-        final aDate = DateTime(aParts[0], aParts[1], aParts[2]);
-        final bDate = DateTime(bParts[0], bParts[1], bParts[2]);
-        return bDate.compareTo(aDate);
-      });
+      ..sort((a, b) => b.compareTo(a));
 
     if (sortedDates.isEmpty) {
       return Padding(
@@ -303,9 +371,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
         ),
       );
       for (final entry in grouped[date]!) {
-        final promptIdx = entry['promptIndex'] as int;
-        final prompt = prompts[promptIdx];
-        final notes = entry['notes'] as String;
+        final excerpt = entry.excerpt;
+        final notes = entry.notes ?? '';
         items.add(
           Card(
             margin: const EdgeInsets.symmetric(vertical: 4),
@@ -320,12 +387,12 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 Icons.check_circle,
                 color: Theme.of(context).colorScheme.primary,
               ),
-              title: Text(prompt['text']!),
+              title: Text(excerpt?.text ?? 'Unknown excerpt'),
               subtitle: notes.isNotEmpty
                   ? Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(prompt['book']!),
+                        Text(excerpt?.bookTitle ?? ''),
                         const SizedBox(height: 4),
                         Text(
                           notes,
@@ -339,7 +406,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                         ),
                       ],
                     )
-                  : Text(prompt['book']!),
+                  : Text(excerpt?.bookTitle ?? ''),
             ),
           ),
         );
@@ -918,8 +985,21 @@ class _DailyReminderScreenState extends State<DailyReminderScreen> {
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: () {
-                      // TODO: Save reminder settings
+                    onPressed: () async {
+                      final userId = AuthService.userId;
+                      if (userId != null) {
+                        try {
+                          if (_isReminderEnabled) {
+                            await ApiService.setReminder(
+                                userId, _reminderTime.hour, _reminderTime.minute);
+                          } else {
+                            await ApiService.clearReminder(userId);
+                          }
+                        } catch (e) {
+                          // Silently fail - local settings still work
+                        }
+                      }
+                      if (!context.mounted) return;
                       showToast(
                         context,
                         _isReminderEnabled
@@ -1072,7 +1152,19 @@ class _InterestsScreenState extends State<InterestsScreen> {
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () async {
+                      final userId = AuthService.userId;
+                      if (userId != null) {
+                        try {
+                          await ApiService.setInterests(
+                              userId, selectedInterests.toList());
+                        } catch (e) {
+                          // Silently fail - local settings still work
+                        }
+                      }
+                      if (!context.mounted) return;
+                      Navigator.pop(context);
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Theme.of(context).colorScheme.primary,
                       foregroundColor: Colors.white,

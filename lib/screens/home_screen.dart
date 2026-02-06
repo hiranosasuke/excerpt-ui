@@ -1,79 +1,20 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
 import '../toast.dart';
-
-final prompts = [
-  {
-    "book": "Think and Grow Rich",
-    "text": "Write your main goal and read it aloud twice today.",
-    "category": "Mindset",
-  },
-  {
-    "book": "Think and Grow Rich",
-    "text": "Visualize your success for 5 minutes.",
-    "category": "Visualization",
-  },
-  {
-    "book": "How to Win Friends and Influence People",
-    "text": "Give a genuine compliment to someone today.",
-    "category": "Connection",
-  },
-  {
-    "book": "How to Win Friends",
-    "text": "Listen more than you speak in your next conversation.",
-    "category": "Connection",
-  },
-  {
-    "book": "Atomic Habits",
-    "text": "Improve one tiny habit by 1% today.",
-    "category": "Habits",
-  },
-  {
-    "book": "The 7 Habits of Highly Effective People",
-    "text": "Begin with the end in mind. Write down your ideal outcome.",
-    "category": "Planning",
-  },
-  {
-    "book": "Man's Search for Meaning",
-    "text": "Find meaning in one challenge you're facing today.",
-    "category": "Reflection",
-  },
-  {
-    "book": "The Power of Now",
-    "text": "Spend 3 minutes fully present, observing your breath.",
-    "category": "Mindfulness",
-  },
-  {
-    "book": "Deep Work",
-    "text": "Block 30 minutes for focused, distraction-free work.",
-    "category": "Focus",
-  },
-];
-
-// Persistent active excerpts — 3 slots, survive navigation within session
-List<int> activeExcerptIndices = [];
-Set<int> retiredExcerptIndices = {};
-
-// Daily check-in state
-Map<String, Set<int>> dailyCheckIns = {};
-Map<String, Map<int, String>> dailyCheckInNotes = {};
-
-// Persistent check-in history: each entry is { 'date', 'promptIndex', 'notes' }
-List<Map<String, dynamic>> checkInHistory = [];
+import '../services/auth_service.dart';
+import '../services/api_service.dart';
+import '../models/excerpt.dart';
+import '../models/check_in.dart';
 
 // User-selected interest categories (set during onboarding, editable in Settings)
 Set<String> selectedInterests = {};
 
+// Local cache of check-in history for LibraryScreen
+List<CheckIn> checkInHistory = [];
+
 String _getTodayKey() {
   final now = DateTime.now();
-  return '${now.year}-${now.month}-${now.day}';
-}
-
-void _initializeActiveExcerpts() {
-  if (activeExcerptIndices.isNotEmpty) return;
-  final pool = List.generate(prompts.length, (i) => i);
-  pool.shuffle(Random());
-  activeExcerptIndices = pool.take(3).toList();
+  return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
 }
 
 class HomeScreen extends StatefulWidget {
@@ -86,22 +27,113 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   late PageController _pageController;
   int _currentIndex = 0;
-  late Set<int> _completedToday;
   late AnimationController _pulseController;
   AnimationController? _confettiController;
   List<Map<String, dynamic>>? _confettiParticles;
   bool _showConfetti = false;
 
+  // API data
+  List<Excerpt> _activeExcerpts = [];
+  Set<int> _completedSlots = {};
+  Map<int, String> _slotCheckInIds = {}; // slot index -> check-in ID
+  Map<int, String> _slotNotes = {}; // slot index -> notes
+  bool _isLoading = true;
+  String? _error;
+
   @override
   void initState() {
     super.initState();
-    _initializeActiveExcerpts();
-    _completedToday = dailyCheckIns[_getTodayKey()] ?? {};
     _pageController = PageController(viewportFraction: 0.85);
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    final userId = AuthService.userId;
+    if (userId == null) {
+      setState(() {
+        _error = 'Not signed in';
+        _isLoading = false;
+      });
+      return;
+    }
+
+    try {
+      // Ensure user exists in backend
+      await ApiService.createUser(userId);
+
+      // Get active excerpts
+      var excerpts = await ApiService.getActiveExcerpts(userId);
+
+      // If no active excerpts, fetch random ones and set them
+      if (excerpts.isEmpty) {
+        final retiredIds = await ApiService.getRetiredExcerptIds(userId);
+        final randomExcerpts = await ApiService.getRandomExcerpts(
+          count: 3,
+          exclude: retiredIds,
+        );
+
+        if (randomExcerpts.isNotEmpty) {
+          final bulkData = randomExcerpts.asMap().entries.map((e) => {
+            'slotIndex': e.key,
+            'excerptId': e.value.id,
+          }).toList();
+          await ApiService.setActiveExcerptsBulk(userId, bulkData);
+          excerpts = randomExcerpts;
+        }
+      }
+
+      // Get today's check-ins to see which are already completed
+      final completedSlots = <int>{};
+      final slotCheckInIds = <int, String>{};
+      final slotNotes = <int, String>{};
+
+      try {
+        final todayCheckIns = await ApiService.getCheckInsByDate(userId, _getTodayKey());
+
+        for (var i = 0; i < excerpts.length; i++) {
+          // Compare as strings to handle both int and UUID ids
+          final excerptId = excerpts[i].id.toString();
+          final checkIn = todayCheckIns.where((c) => c.excerptId.toString() == excerptId).firstOrNull;
+          if (checkIn != null) {
+            completedSlots.add(i);
+            slotCheckInIds[i] = checkIn.id;
+            if (checkIn.notes != null) {
+              slotNotes[i] = checkIn.notes!;
+            }
+          }
+        }
+      } catch (e) {
+        // If fetching today's check-ins fails, just show all as uncompleted
+        print('Failed to fetch today check-ins: $e');
+      }
+
+      // Load full check-in history for library screen
+      try {
+        checkInHistory = await ApiService.getCheckIns(userId);
+      } catch (e) {
+        print('Failed to fetch check-in history: $e');
+        // Keep existing history or empty list
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _activeExcerpts = excerpts;
+        _completedSlots = completedSlots;
+        _slotCheckInIds = slotCheckInIds;
+        _slotNotes = slotNotes;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -112,29 +144,50 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  void _markComplete(int index) {
-    setState(() {
-      _completedToday.add(index);
-      dailyCheckIns[_getTodayKey()] = _completedToday;
-    });
+  Future<void> _markComplete(int slotIndex) async {
+    final userId = AuthService.userId;
+    if (userId == null) return;
 
-    checkInHistory.add({
-      'date': _getTodayKey(),
-      'promptIndex': activeExcerptIndices[index],
-      'notes': _getNotesForSlot(index),
-    });
+    final excerpt = _activeExcerpts[slotIndex];
 
-    if (_allCompleted) {
-      _triggerConfetti();
-    } else if (index < activeExcerptIndices.length - 1) {
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) {
-          _pageController.nextPage(
-            duration: const Duration(milliseconds: 400),
-            curve: Curves.easeOutCubic,
-          );
-        }
+    try {
+      // Create check-in
+      final checkIn = await ApiService.createCheckIn(
+        userId,
+        excerpt.id,
+        _getTodayKey(),
+        notes: _slotNotes[slotIndex],
+      );
+
+      // Record activity for streak
+      await ApiService.recordActivity(userId, _getTodayKey());
+
+      if (!mounted) return;
+      setState(() {
+        _completedSlots.add(slotIndex);
+        _slotCheckInIds[slotIndex] = checkIn.id;
       });
+
+      // Refresh check-in history
+      checkInHistory = await ApiService.getCheckIns(userId);
+
+      if (!mounted) return;
+      if (_allCompleted) {
+        _triggerConfetti();
+      } else if (slotIndex < _activeExcerpts.length - 1) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            _pageController.nextPage(
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeOutCubic,
+            );
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        showToast(context, 'Failed to check in: $e');
+      }
     }
   }
 
@@ -176,56 +229,89 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             });
   }
 
-  void _markIncomplete(int index) {
-    setState(() {
-      _completedToday.remove(index);
-      dailyCheckIns[_getTodayKey()] = _completedToday;
-    });
+  Future<void> _markIncomplete(int slotIndex) async {
+    final checkInId = _slotCheckInIds[slotIndex];
+    if (checkInId == null) return;
 
-    checkInHistory.removeWhere((e) =>
-        e['date'] == _getTodayKey() &&
-        e['promptIndex'] == activeExcerptIndices[index]);
+    try {
+      await ApiService.deleteCheckIn(checkInId);
+
+      setState(() {
+        _completedSlots.remove(slotIndex);
+        _slotCheckInIds.remove(slotIndex);
+      });
+
+      // Refresh check-in history
+      final userId = AuthService.userId;
+      if (userId != null) {
+        checkInHistory = await ApiService.getCheckIns(userId);
+      }
+    } catch (e) {
+      if (mounted) {
+        showToast(context, 'Failed to undo: $e');
+      }
+    }
   }
 
-  void _retireExcerpt(int slotIndex) {
-    final retiredIndex = activeExcerptIndices[slotIndex];
-    retiredExcerptIndices.add(retiredIndex);
+  Future<void> _retireExcerpt(int slotIndex) async {
+    final userId = AuthService.userId;
+    if (userId == null) return;
 
-    final currentActive = activeExcerptIndices.toSet();
-    final pool = List.generate(prompts.length, (i) => i)
-        .where((i) =>
-            !currentActive.contains(i) && !retiredExcerptIndices.contains(i))
-        .toList();
+    final excerpt = _activeExcerpts[slotIndex];
 
-    if (pool.isEmpty) {
-      showToast(context, "All excerpts have been mastered!");
-      return;
+    try {
+      // Retire the excerpt
+      await ApiService.retireExcerpt(userId, excerpt.id);
+
+      // Get a replacement
+      final retiredIds = await ApiService.getRetiredExcerptIds(userId);
+      final currentIds = _activeExcerpts.map((e) => e.id).toList();
+      final excludeIds = [...retiredIds, ...currentIds];
+
+      final replacements = await ApiService.getRandomExcerpts(
+        count: 1,
+        exclude: excludeIds,
+      );
+
+      if (replacements.isEmpty) {
+        if (mounted) showToast(context, "All excerpts have been mastered!");
+        return;
+      }
+
+      final replacement = replacements.first;
+      await ApiService.setActiveExcerpt(userId, slotIndex, replacement.id);
+
+      // Delete any check-in for this slot today
+      final checkInId = _slotCheckInIds[slotIndex];
+      if (checkInId != null) {
+        await ApiService.deleteCheckIn(checkInId);
+      }
+
+      setState(() {
+        _activeExcerpts[slotIndex] = replacement;
+        _completedSlots.remove(slotIndex);
+        _slotCheckInIds.remove(slotIndex);
+        _slotNotes.remove(slotIndex);
+      });
+
+      // Refresh check-in history
+      checkInHistory = await ApiService.getCheckIns(userId);
+
+      if (mounted) showToast(context, "Excerpt replaced with a new one!");
+    } catch (e) {
+      if (mounted) showToast(context, 'Failed to retire: $e');
     }
-
-    final replacement = pool[Random().nextInt(pool.length)];
-
-    checkInHistory.removeWhere(
-        (e) => e['date'] == _getTodayKey() && e['promptIndex'] == retiredIndex);
-
-    setState(() {
-      activeExcerptIndices[slotIndex] = replacement;
-      _completedToday.remove(slotIndex);
-      dailyCheckIns[_getTodayKey()] = _completedToday;
-      dailyCheckInNotes[_getTodayKey()]?.remove(slotIndex);
-    });
-
-    showToast(context, "Excerpt replaced with a new one!");
   }
 
   Future<void> _confirmRetire(int slotIndex) async {
-    final excerpt = prompts[activeExcerptIndices[slotIndex]];
+    final excerpt = _activeExcerpts[slotIndex];
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text("Mark as mastered?"),
         content: Text(
-          '"${excerpt['text']}" will be replaced with a new excerpt.',
+          '"${excerpt.text}" will be replaced with a new excerpt.',
         ),
         actions: [
           TextButton(
@@ -249,20 +335,27 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   String _getNotesForSlot(int slotIndex) {
-    return dailyCheckInNotes[_getTodayKey()]?[slotIndex] ?? '';
+    return _slotNotes[slotIndex] ?? '';
   }
 
-  void _saveNotesForSlot(int slotIndex, String notes) {
+  Future<void> _saveNotesForSlot(int slotIndex, String notes) async {
     setState(() {
-      dailyCheckInNotes.putIfAbsent(_getTodayKey(), () => {})[slotIndex] =
-          notes;
+      _slotNotes[slotIndex] = notes;
     });
 
-    final idx = checkInHistory.indexWhere((e) =>
-        e['date'] == _getTodayKey() &&
-        e['promptIndex'] == activeExcerptIndices[slotIndex]);
-    if (idx >= 0) {
-      checkInHistory[idx]['notes'] = notes;
+    // If already checked in, update the check-in
+    final checkInId = _slotCheckInIds[slotIndex];
+    if (checkInId != null) {
+      try {
+        await ApiService.updateCheckInNotes(checkInId, notes);
+        // Refresh check-in history
+        final userId = AuthService.userId;
+        if (userId != null) {
+          checkInHistory = await ApiService.getCheckIns(userId);
+        }
+      } catch (e) {
+        if (mounted) showToast(context, 'Failed to save notes: $e');
+      }
     }
   }
 
@@ -288,11 +381,47 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  int get _completedCount => _completedToday.length;
-  bool get _allCompleted => _completedCount == activeExcerptIndices.length;
+  int get _completedCount => _completedSlots.length;
+  bool get _allCompleted => _completedCount == _activeExcerpts.length && _activeExcerpts.isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_error != null) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Error: $_error'),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _isLoading = true;
+                    _error = null;
+                  });
+                  _loadData();
+                },
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_activeExcerpts.isEmpty) {
+      return const Scaffold(
+        body: Center(child: Text('No excerpts available')),
+      );
+    }
+
     return Scaffold(
       body: Stack(
         children: [
@@ -308,7 +437,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     children: [
                       // Title
                       Text(
-                        _allCompleted ? "All checked in! 🎉" : "Daily Check-in",
+                        _allCompleted ? "All checked in!" : "Daily Check-in",
                         style: const TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
@@ -321,7 +450,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           Text(
                             _allCompleted
                                 ? "You've checked in for all excerpts"
-                                : "$_completedCount of ${activeExcerptIndices.length} checked in today",
+                                : "$_completedCount of ${_activeExcerpts.length} checked in today",
                             style: TextStyle(
                               fontSize: 14,
                               color: Theme.of(context)
@@ -340,7 +469,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               borderRadius: BorderRadius.circular(16),
                             ),
                             child: Text(
-                              "$_completedCount/${activeExcerptIndices.length}",
+                              "$_completedCount/${_activeExcerpts.length}",
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
@@ -355,8 +484,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children:
-                            List.generate(activeExcerptIndices.length, (index) {
-                          final isCompleted = _completedToday.contains(index);
+                            List.generate(_activeExcerpts.length, (index) {
+                          final isCompleted = _completedSlots.contains(index);
                           final isCurrent = index == _currentIndex;
                           return GestureDetector(
                             onTap: () {
@@ -444,7 +573,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     controller: _pageController,
                     onPageChanged: (index) =>
                         setState(() => _currentIndex = index),
-                    itemCount: activeExcerptIndices.length,
+                    itemCount: _activeExcerpts.length,
                     itemBuilder: (context, index) {
                       return AnimatedBuilder(
                         animation: _pageController,
@@ -490,8 +619,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildExcerptCard(BuildContext context, int slotIndex) {
-    final excerpt = prompts[activeExcerptIndices[slotIndex]];
-    final isCheckedIn = _completedToday.contains(slotIndex);
+    final excerpt = _activeExcerpts[slotIndex];
+    final isCheckedIn = _completedSlots.contains(slotIndex);
     final hasNotes = _getNotesForSlot(slotIndex).isNotEmpty;
 
     return Container(
@@ -538,7 +667,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
-                excerpt["category"] ?? "Practice",
+                excerpt.category,
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -549,7 +678,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             const SizedBox(height: 16),
             // Excerpt text
             Text(
-              excerpt["text"] ?? "",
+              excerpt.text,
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
@@ -574,7 +703,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 const SizedBox(width: 8),
                 Flexible(
                   child: Text(
-                    excerpt["book"] ?? "",
+                    excerpt.bookTitle,
                     style: TextStyle(
                       fontSize: 14,
                       color: Theme.of(context)
