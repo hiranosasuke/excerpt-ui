@@ -673,17 +673,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
             const SizedBox(height: 16),
             // Excerpt text
-            Text(
-              excerpt.text,
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                height: 1.3,
-                color: isCheckedIn
-                    ? Theme.of(context).colorScheme.onSurface.withOpacity(0.7)
-                    : Theme.of(context).colorScheme.onSurface,
+            Flexible(
+              child: Text(
+                excerpt.text,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  height: 1.3,
+                  color: isCheckedIn
+                      ? Theme.of(context).colorScheme.onSurface.withOpacity(0.7)
+                      : Theme.of(context).colorScheme.onSurface,
+                ),
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 6,
               ),
-              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
             // Book source

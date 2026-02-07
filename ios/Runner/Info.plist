@@ -45,5 +45,16 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+    <key>CFBundleURLTypes</key>
+    <array>
+      <dict>
+        <key>CFBundleURLSchemes</key>
+        <array>
+          <string>io.supabase.dailybeliefs</string>
+          <string>com.googleusercontent.apps.210570581422-ogb4fg2escji397oo6qrm3ke9d070so8</string>
+        </array>
+      </dict>
+    </array>
+
 </dict>
 </plist>
